@@ -5,7 +5,9 @@ import type { CategoryKind } from "@/lib/schedule-f";
 
 import { MIGRATIONS } from "./migrations";
 import type {
+  Asset,
   CategoryTotal,
+  NewAsset,
   NewTimeEntry,
   NewTransaction,
   Receipt,
@@ -67,6 +69,28 @@ function mapReceipt(r: Row): Receipt {
     mimeType: str(r.mime_type),
     byteSize: num(r.byte_size),
     createdAt: str(r.created_at),
+  };
+}
+
+function mapAsset(r: Row): Asset {
+  return {
+    id: num(r.id),
+    name: str(r.name),
+    description: nstr(r.description),
+    assetClassId: str(r.asset_class),
+    method: str(r.method) as Asset["method"],
+    convention: str(r.convention) as Asset["convention"],
+    placedInService: str(r.placed_in_service),
+    cost: num(r.cost),
+    section179: num(r.section_179),
+    bonusPercent: num(r.bonus_percent),
+    businessUsePercent: num(r.business_use_percent),
+    disposedDate: nstr(r.disposed_date),
+    disposalProceeds: nnum(r.disposal_proceeds),
+    notes: nstr(r.notes),
+    createdBy: nnum(r.created_by),
+    createdAt: str(r.created_at),
+    updatedAt: str(r.updated_at),
   };
 }
 
@@ -422,6 +446,92 @@ export class Store {
       .prepare(`SELECT COALESCE(SUM(minutes), 0) AS n FROM time_entries WHERE ${clauses.join(" AND ")}`)
       .get(...params) as Row;
     return num(row.n);
+  }
+
+  // --- assets --------------------------------------------------------------
+
+  createAsset(input: NewAsset): Asset {
+    const info = this.db
+      .prepare(
+        `INSERT INTO assets
+           (name, description, asset_class, method, convention, placed_in_service, cost,
+            section_179, bonus_percent, business_use_percent, disposed_date,
+            disposal_proceeds, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.name,
+        input.description ?? null,
+        input.assetClassId,
+        input.method,
+        input.convention,
+        input.placedInService,
+        input.cost,
+        input.section179 ?? 0,
+        input.bonusPercent ?? 0,
+        input.businessUsePercent ?? 100,
+        input.disposedDate ?? null,
+        input.disposalProceeds ?? null,
+        input.notes ?? null,
+        input.createdBy ?? null,
+      );
+    return this.getAsset(Number(info.lastInsertRowid))!;
+  }
+
+  getAsset(id: number): Asset | undefined {
+    const row = this.db.prepare("SELECT * FROM assets WHERE id = ?").get(id) as Row | undefined;
+    return row ? mapAsset(row) : undefined;
+  }
+
+  updateAsset(id: number, patch: Omit<NewAsset, "createdBy">): Asset | undefined {
+    this.db
+      .prepare(
+        `UPDATE assets
+         SET name = ?, description = ?, asset_class = ?, method = ?, convention = ?,
+             placed_in_service = ?, cost = ?, section_179 = ?, bonus_percent = ?,
+             business_use_percent = ?, disposed_date = ?, disposal_proceeds = ?,
+             notes = ?, updated_at = datetime('now')
+         WHERE id = ?`,
+      )
+      .run(
+        patch.name,
+        patch.description ?? null,
+        patch.assetClassId,
+        patch.method,
+        patch.convention,
+        patch.placedInService,
+        patch.cost,
+        patch.section179 ?? 0,
+        patch.bonusPercent ?? 0,
+        patch.businessUsePercent ?? 100,
+        patch.disposedDate ?? null,
+        patch.disposalProceeds ?? null,
+        patch.notes ?? null,
+        id,
+      );
+    return this.getAsset(id);
+  }
+
+  deleteAsset(id: number): void {
+    this.db.prepare("DELETE FROM assets WHERE id = ?").run(id);
+  }
+
+  listAssets(): Asset[] {
+    const rows = this.db
+      .prepare("SELECT * FROM assets ORDER BY placed_in_service DESC, id DESC")
+      .all() as Row[];
+    return rows.map(mapAsset);
+  }
+
+  /** Assets placed in service during a year - the mid-quarter test looks at these. */
+  assetsPlacedInYear(year: number): Asset[] {
+    const { start, end } = yearBounds(year);
+    const rows = this.db
+      .prepare(
+        "SELECT * FROM assets WHERE placed_in_service BETWEEN ? AND ? ORDER BY placed_in_service, id",
+      )
+      .all(start, end) as Row[];
+    return rows.map(mapAsset);
   }
 
   /** Minutes grouped by task for a year, largest first. */

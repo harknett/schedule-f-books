@@ -3,10 +3,12 @@ import Link from "next/link";
 import { ArrowDownIcon, ArrowUpIcon, ClockIcon } from "@/components/icons";
 import { TransactionList } from "@/components/transaction-row";
 import { ButtonLink, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
+import { summarizeYear } from "@/lib/assets";
 import { requireUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
 import { currentYear } from "@/lib/dates";
 import { formatDuration } from "@/lib/duration";
+import { formatUsd } from "@/lib/money";
 import { buildReport } from "@/lib/report";
 
 export const metadata = { title: "Schedule F Books" };
@@ -22,7 +24,10 @@ export default async function DashboardPage() {
   const store = getStore();
   const year = currentYear();
 
-  const report = buildReport(year, store.categoryTotals(year));
+  const depreciation = summarizeYear(store.listAssets(), year);
+  const report = buildReport(year, store.categoryTotals(year), {
+    assetDepreciation: depreciation.total,
+  });
   const recent = store.listTransactions({ limit: 6 });
   const minutes = store.totalMinutes(user.id, year);
 
@@ -90,7 +95,22 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      {report.transactionCount > 0 ? (
+      {depreciation.total > 0 ? (
+        <Card className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium">Depreciation · line 14</p>
+            <p className="text-sm text-muted">
+              {formatUsd(depreciation.total)} from {depreciation.rows.length}{" "}
+              {depreciation.rows.length === 1 ? "asset" : "assets"} this year.
+            </p>
+          </div>
+          <ButtonLink href="/assets" variant="secondary">
+            Assets
+          </ButtonLink>
+        </Card>
+      ) : null}
+
+      {report.transactionCount > 0 || depreciation.total > 0 ? (
         <Card className="flex items-center justify-between gap-3">
           <div>
             <p className="font-medium">Year-end report</p>

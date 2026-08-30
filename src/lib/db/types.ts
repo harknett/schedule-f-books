@@ -1,3 +1,4 @@
+import type { Convention, DepreciationMethod } from "@/lib/depreciation";
 import type { Cents } from "@/lib/money";
 import type { CategoryKind } from "@/lib/schedule-f";
 
@@ -83,4 +84,42 @@ export interface CategoryTotal {
   categoryId: string;
   total: Cents;
   count: number;
+}
+
+export interface Asset {
+  id: number;
+  name: string;
+  description: string | null;
+  assetClassId: string;
+  method: DepreciationMethod;
+  convention: Convention;
+  placedInService: string;
+  cost: Cents;
+  section179: Cents;
+  bonusPercent: number;
+  businessUsePercent: number;
+  /** Set once sold, traded, or scrapped; depreciation stops that year. */
+  disposedDate: string | null;
+  disposalProceeds: Cents | null;
+  notes: string | null;
+  createdBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewAsset {
+  name: string;
+  description?: string | null;
+  assetClassId: string;
+  method: DepreciationMethod;
+  convention: Convention;
+  placedInService: string;
+  cost: Cents;
+  section179?: Cents;
+  bonusPercent?: number;
+  businessUsePercent?: number;
+  disposedDate?: string | null;
+  disposalProceeds?: Cents | null;
+  notes?: string | null;
+  createdBy?: number | null;
 }

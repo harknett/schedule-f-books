@@ -64,4 +64,30 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_time_entries_user_date ON time_entries(user_id, date);
   `,
+
+  // Depreciable assets. The yearly schedule is derived from these inputs
+  // rather than stored, so correcting a cost or a class re-runs cleanly.
+  `
+  CREATE TABLE assets (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name                 TEXT NOT NULL,
+    description          TEXT,
+    asset_class          TEXT NOT NULL,
+    method               TEXT NOT NULL CHECK (method IN ('200DB','150DB','SL')),
+    convention           TEXT NOT NULL CHECK (convention IN ('half-year','mid-quarter','mid-month')),
+    placed_in_service    TEXT NOT NULL,
+    cost                 INTEGER NOT NULL CHECK (cost >= 0),
+    section_179          INTEGER NOT NULL DEFAULT 0 CHECK (section_179 >= 0),
+    bonus_percent        REAL NOT NULL DEFAULT 0 CHECK (bonus_percent BETWEEN 0 AND 100),
+    business_use_percent REAL NOT NULL DEFAULT 100 CHECK (business_use_percent > 0 AND business_use_percent <= 100),
+    disposed_date        TEXT,
+    disposal_proceeds    INTEGER,
+    notes                TEXT,
+    created_by           INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at           TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at           TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX idx_assets_placed ON assets(placed_in_service);
+  CREATE INDEX idx_assets_disposed ON assets(disposed_date);
+  `,
 ];

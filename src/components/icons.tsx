@@ -121,3 +121,14 @@ export function SettingsIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+export function TractorIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="7" cy="17" r="3.5" />
+      <circle cx="17.5" cy="18" r="2.5" />
+      <path d="M7 13.5V7h5l2 5h3.5v3.5" />
+      <path d="M12 7V4h4" />
+    </Icon>
+  );
+}

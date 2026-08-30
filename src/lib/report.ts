@@ -18,6 +18,8 @@ export interface ReportLine {
   computed?: boolean;
   /** Line 1b is entered as a positive number but subtracts from gross income. */
   contra?: boolean;
+  /** Shown under the line, e.g. how line 14 splits between sources. */
+  note?: string;
 }
 
 export interface ScheduleFReport {
@@ -33,7 +35,21 @@ export interface ScheduleFReport {
   /** Line 34. Negative means a loss. */
   netProfit: Cents;
   transactionCount: number;
+  /** The part of line 14 that came from the asset schedule rather than an entry. */
+  assetDepreciation: Cents;
 }
+
+export interface ReportOptions {
+  /**
+   * Depreciation computed from the asset register for this year. It is added
+   * to line 14 on top of anything entered by hand, and broken out on the line
+   * so the two sources stay visible rather than silently doubling up.
+   */
+  assetDepreciation?: Cents;
+}
+
+/** The Schedule F line that depreciation belongs on. */
+const DEPRECIATION_CATEGORY = "depreciation";
 
 /**
  * Roll per-category totals up into Schedule F's line structure.
@@ -43,8 +59,13 @@ export interface ScheduleFReport {
  *     amounts entered. Elections and deferrals (6c/6d) are not modelled.
  *   - Line 32 "other expenses" is a single bucket rather than 32a-32f.
  */
-export function buildReport(year: number, totals: CategoryTotal[]): ScheduleFReport {
+export function buildReport(
+  year: number,
+  totals: CategoryTotal[],
+  options: ReportOptions = {},
+): ScheduleFReport {
   const byCategory = new Map(totals.map((t) => [t.categoryId, t]));
+  const assetDepreciation = options.assetDepreciation ?? 0;
 
   const lineFor = (categoryId: string): ReportLine => {
     const category = requireCategory(categoryId);
@@ -87,7 +108,21 @@ export function buildReport(year: number, totals: CategoryTotal[]): ScheduleFRep
       0,
     );
 
-  const expenses = EXPENSE_CATEGORIES.map((c) => lineFor(c.id)).sort((a, b) => {
+  const expenses = EXPENSE_CATEGORIES.map((c) => {
+    const row = lineFor(c.id);
+    if (c.id !== DEPRECIATION_CATEGORY || assetDepreciation === 0) return row;
+
+    // Line 14 carries the asset schedule plus anything entered by hand.
+    const entered = row.amount;
+    return {
+      ...row,
+      amount: entered + assetDepreciation,
+      note:
+        entered === 0
+          ? "From the asset schedule"
+          : "Asset schedule plus entries recorded by hand",
+    };
+  }).sort((a, b) => {
     const [an, as] = lineSortKey(a.line);
     const [bn, bs] = lineSortKey(b.line);
     return an - bn || as.localeCompare(bs);
@@ -104,6 +139,7 @@ export function buildReport(year: number, totals: CategoryTotal[]): ScheduleFRep
     totalExpenses,
     netProfit: grossIncome - totalExpenses,
     transactionCount,
+    assetDepreciation,
   };
 }
 

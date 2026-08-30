@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guard";
+import { summarizeYear } from "@/lib/assets";
 import { getStore } from "@/lib/db";
 import { currentYear } from "@/lib/dates";
 import { formatUsd } from "@/lib/money";
@@ -26,7 +27,10 @@ export default async function ReportPage({
       : (years[0] ?? currentYear());
 
   const showAll = params.all === "1";
-  const report = buildReport(year, store.categoryTotals(year));
+  const depreciation = summarizeYear(store.listAssets(), year);
+  const report = buildReport(year, store.categoryTotals(year), {
+    assetDepreciation: depreciation.total,
+  });
 
   const visible = (lines: ReportLine[]) =>
     showAll ? lines : lines.filter((l) => l.amount !== 0 || l.count > 0 || l.computed);
@@ -141,6 +145,9 @@ function LineRow({ line }: { line: ReportLine }) {
       <span className="min-w-0 flex-1">
         {line.label}
         {line.contra ? <span className="text-muted"> (subtracted)</span> : null}
+        {line.note ? (
+          <span className="block text-xs font-normal text-muted">{line.note}</span>
+        ) : null}
       </span>
       {line.count > 0 ? (
         <span className="tabular hidden shrink-0 text-xs text-muted sm:inline">

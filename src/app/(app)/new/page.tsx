@@ -1,6 +1,12 @@
 import Link from "next/link";
 
-import { ArrowDownIcon, ArrowUpIcon, ChevronIcon, ClockIcon } from "@/components/icons";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChevronIcon,
+  ClockIcon,
+  TractorIcon,
+} from "@/components/icons";
 import { PageHeader } from "@/components/ui";
 
 export const metadata = { title: "Add · Schedule F Books" };
@@ -26,6 +32,13 @@ const CHOICES = [
     body: "Log time on the farm before you forget it.",
     Icon: ClockIcon,
     tone: "text-accent",
+  },
+  {
+    href: "/assets/new",
+    label: "Asset",
+    body: "Machinery, buildings, or breeding stock to depreciate.",
+    Icon: TractorIcon,
+    tone: "text-muted",
   },
 ] as const;
 

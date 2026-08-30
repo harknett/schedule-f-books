@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { summarizeYear } from "@/lib/assets";
 import { currentUser } from "@/lib/auth/session";
 import { getStore } from "@/lib/db";
 import { buildReport, reportToCsv } from "@/lib/report";
@@ -18,7 +19,11 @@ export async function GET(
   if (!match) return new NextResponse("Not found", { status: 404 });
 
   const year = Number(match[1]);
-  const report = buildReport(year, getStore().categoryTotals(year));
+  const store = getStore();
+  const report = buildReport(year, store.categoryTotals(year), {
+    // Keep the CSV in step with the on-screen report, line 14 included.
+    assetDepreciation: summarizeYear(store.listAssets(), year).total,
+  });
 
   return new NextResponse(reportToCsv(report), {
     headers: {
