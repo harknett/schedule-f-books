@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { registerOwner, type AuthState } from "../actions";
 import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
-import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
 
 function Submit() {
   const { pending } = useFormStatus();

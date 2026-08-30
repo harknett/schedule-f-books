@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { addUser, changePassword, type SettingsState } from "./actions";
 import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
-import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
 
 function Submit({ label }: { label: string }) {
   const { pending } = useFormStatus();

@@ -1,5 +1,14 @@
+import "server-only";
+
 import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
+
+import { MIN_PASSWORD_LENGTH, validatePassword } from "./password-policy";
+
+// Re-exported so server code has one import site for everything password-related.
+// Client components must import these from ./password-policy instead - this
+// module is server-only because node:crypto is empty in the browser.
+export { MIN_PASSWORD_LENGTH, validatePassword };
 
 const scryptAsync = promisify(scrypt) as (
   password: string,
@@ -13,8 +22,6 @@ const scryptAsync = promisify(scrypt) as (
 const PARAMS = { N: 16384, r: 8, p: 1 } as const;
 const KEY_LENGTH = 64;
 const SALT_LENGTH = 16;
-
-export const MIN_PASSWORD_LENGTH = 10;
 
 /** Encoded as `scrypt$N$r$p$salt$hash`, both binary parts base64. */
 export async function hashPassword(password: string): Promise<string> {
@@ -50,13 +57,4 @@ export async function verifyPassword(password: string, encoded: string): Promise
     options,
   );
   return derived.length === expected.length && timingSafeEqual(derived, expected);
-}
-
-export function validatePassword(password: string): void {
-  if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
-  }
-  if (password.length > 1024) {
-    throw new Error("Password is too long.");
-  }
 }
