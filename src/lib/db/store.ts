@@ -585,6 +585,33 @@ export class Store {
     return rows.map(mapAsset);
   }
 
+  /**
+   * Time entries across a date range. Omit `userId` for everyone's, which the
+   * owner may want when handing records to a preparer.
+   */
+  listTimeEntriesInRange(
+    from: string,
+    to: string,
+    userId?: number,
+  ): Array<TimeEntry & { userName: string | null }> {
+    const clauses = ["t.date BETWEEN ? AND ?"];
+    const params: Array<string | number> = [from, to];
+    if (userId != null) {
+      clauses.push("t.user_id = ?");
+      params.push(userId);
+    }
+    const rows = this.db
+      .prepare(
+        `SELECT t.*, u.name AS user_name
+         FROM time_entries t
+         LEFT JOIN users u ON u.id = t.user_id
+         WHERE ${clauses.join(" AND ")}
+         ORDER BY t.date, t.id`,
+      )
+      .all(...params) as Row[];
+    return rows.map((r) => ({ ...mapTimeEntry(r), userName: nstr(r.user_name) }));
+  }
+
   /** Minutes grouped by task for a year, largest first. */
   minutesByTask(userId: number, year: number): Array<{ task: string; minutes: number }> {
     const { start, end } = yearBounds(year);

@@ -26,6 +26,9 @@ afterthought.
   [Depreciation](#depreciation).
 - **CSV import** for a bank export, a spreadsheet, or a timesheet, with column
   matching, a preview, and duplicate detection. See [Importing a CSV](#importing-a-csv).
+- **Export** of any date range as a single ZIP: the Schedule F summary, the
+  supporting detail, the depreciation working, the receipts, and a lossless
+  copy for archiving. See [Exporting](#exporting).
 - **Schedule F report** for any year, on screen or as CSV for your preparer.
 - **Multiple accounts** sharing one set of farm books. Hours stay personal to
   whoever logged them.
@@ -100,6 +103,37 @@ expenses mapping Amount to Debit, then income mapping Amount to Credit.
 
 There is a blank template to download on the page if you'd rather type it out.
 
+## Exporting
+
+**Settings → Export**, or **Full export** from the report. Pick a date range and
+you get one ZIP that serves both purposes the records have: something to hand
+over, and something to keep.
+
+```
+README.txt              what is in the package, the totals, and the caveats
+schedule-f-2026.csv     every Schedule F line for that tax year
+transactions.csv        every entry, each carrying its Schedule F line
+assets.csv              the depreciable asset register
+depreciation-2026.csv   per-asset working for Form 4562
+hours.csv               hours worked, in minutes and decimal hours
+receipts/               images, named txn-<id>-<n> to match transactions.csv
+archive.json            the same data losslessly, in cents
+```
+
+A range spanning several tax years gets a `schedule-f-<year>.csv` and a
+`depreciation-<year>.csv` for each, because Schedule F is an annual form.
+Amounts in the CSVs are dollars, for spreadsheets; `archive.json` keeps integer
+cents, for machines. Receipts and the JSON copy can each be left out for a
+smaller file.
+
+Assets are not filtered by the date range - a tractor bought in 2019 still
+depreciates into the years being exported - and the README states the totals so
+a preparer can cross-check at a glance.
+
+**This is also your backup.** The `data/` directory is the live copy; a dated
+export is a complete, readable second copy that does not depend on this
+software still running. Take one at year end, and keep it.
+
 ## Depreciation
 
 Add a tractor, a machine shed, drainage tile, or breeding stock under
@@ -151,8 +185,9 @@ data/
   receipts/
 ```
 
-Back up that directory and you have backed up the books. Set `DATA_DIR` to put
-it somewhere else:
+Back up that directory and you have backed up the books - or take a dated
+[export](#exporting), which is readable without this software. Set `DATA_DIR`
+to put the live copy somewhere else:
 
 ```bash
 DATA_DIR=/mnt/backup/farm-books npm start
@@ -195,6 +230,8 @@ src/
     schedule-f.ts     the chart of accounts - Schedule F lines
     csv.ts            RFC 4180 reader and writer
     import.ts         column matching, date inference, row validation
+    zip.ts            ZIP writer, no dependency
+    export.ts         builds the handover/archive package
     depreciation.ts   MACRS engine; verified against the IRS optional tables
     assets.ts         stored assets -> schedules -> the line 14 figure
     report.ts         roll-up into Part I / Part II / line 34, and CSV

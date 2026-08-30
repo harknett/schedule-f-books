@@ -141,3 +141,12 @@ export function UploadIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+export function DownloadIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M12 4v12M8 12l4 4 4-4" />
+      <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+    </Icon>
+  );
+}

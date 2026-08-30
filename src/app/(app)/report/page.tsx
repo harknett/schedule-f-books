@@ -78,6 +78,12 @@ export default async function ReportPage({
           >
             CSV
           </a>
+          <Link
+            href={`/export?year=${year}`}
+            className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm text-muted hover:bg-surface-muted"
+          >
+            Full export
+          </Link>
         </div>
       </div>
 

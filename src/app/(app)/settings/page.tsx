@@ -1,4 +1,4 @@
-import { Button, Card, PageHeader } from "@/components/ui";
+import { Button, ButtonLink, Card, PageHeader } from "@/components/ui";
 import { signOut } from "@/app/(auth)/actions";
 import { requireUser } from "@/lib/auth/guard";
 import { dataDir, getStore } from "@/lib/db";
@@ -53,6 +53,18 @@ export default async function SettingsPage() {
       </section>
 
       {user.role === "owner" ? <AddUserForm /> : null}
+
+      <Card className="space-y-3">
+        <div>
+          <h2 className="font-semibold">Export</h2>
+          <p className="text-sm text-muted mt-0.5">
+            A dated package to archive, or to hand to whoever prepares the return.
+          </p>
+        </div>
+        <ButtonLink href="/export" variant="secondary">
+          Export data
+        </ButtonLink>
+      </Card>
 
       <Card className="space-y-2">
         <h2 className="font-semibold">Your data</h2>
