@@ -1,5 +1,5 @@
 import { TrashIcon } from "@/components/icons";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, EmptyState, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
 import { currentYear, shortDate, today } from "@/lib/dates";
@@ -21,7 +21,15 @@ export default async function TimePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Hours" subtitle={`Your labour on the farm in ${year}.`} />
+      <PageHeader
+        title="Hours"
+        subtitle={`Your labour on the farm in ${year}.`}
+        action={
+          <ButtonLink href="/import" variant="secondary">
+            Import
+          </ButtonLink>
+        }
+      />
 
       <div className="card px-4 py-3">
         <p className="text-xs uppercase tracking-wide text-muted">Logged in {year}</p>

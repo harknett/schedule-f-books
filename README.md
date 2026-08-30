@@ -24,6 +24,8 @@ afterthought.
 - **Asset depreciation** under MACRS, with a full year-by-year schedule that
   feeds Schedule F line 14 automatically. See
   [Depreciation](#depreciation).
+- **CSV import** for a bank export, a spreadsheet, or a timesheet, with column
+  matching, a preview, and duplicate detection. See [Importing a CSV](#importing-a-csv).
 - **Schedule F report** for any year, on screen or as CSV for your preparer.
 - **Multiple accounts** sharing one set of farm books. Hours stay personal to
   whoever logged them.
@@ -62,6 +64,41 @@ same network use the machine's LAN address, or put it behind a reverse proxy
 with HTTPS for access from anywhere. Use HTTPS for anything beyond your own
 network: session cookies are marked `secure` in production and will not be sent
 over plain HTTP.
+
+## Importing a CSV
+
+**Books → Import**, or **Hours → Import**. Choose whether the file is expenses,
+income, or hours, pick it, and check the preview before anything is written.
+
+It reads what banks and spreadsheets actually produce:
+
+- **Columns are matched for you** from the header, and every match is a
+  dropdown you can correct. A file whose only text column is `Description` puts
+  it in the payee field, where the entry list shows it.
+- **Date formats are worked out from the file.** `03/04/2026` is genuinely
+  ambiguous, so it looks for a day above 12 elsewhere in the column to settle
+  it, and shows you the choice when the file can't settle it either.
+- **Delimiters, quoting, and encodings**: comma, semicolon, or tab; quoted
+  fields containing commas or newlines; CRLF endings; and the byte order mark
+  Excel writes.
+- **Amounts** may be negative, parenthesised, or carry `$` and thousands
+  separators. They are stored as positive, with direction taken from the kind
+  you chose.
+- **Durations** may be `2.5`, `2h 30m`, `2:30`, or `90m`.
+- **Categories** match on a Schedule F line number (`16`), a name (`Feed`), or
+  our id (`feed`). Anything unmatched falls to a default you pick, and says so.
+- **Duplicates are flagged** against what you already have — matched on date,
+  amount, and who it was with — so re-importing last month's export doesn't
+  double your books.
+
+Rows that can't be read are listed with the line number and the reason, and are
+skipped rather than guessed at. The whole import is one database transaction:
+if anything fails, nothing is written.
+
+A bank export with separate Debit and Credit columns is two passes: import
+expenses mapping Amount to Debit, then income mapping Amount to Credit.
+
+There is a blank template to download on the page if you'd rather type it out.
 
 ## Depreciation
 
@@ -156,6 +193,8 @@ Layout:
 src/
   lib/
     schedule-f.ts     the chart of accounts - Schedule F lines
+    csv.ts            RFC 4180 reader and writer
+    import.ts         column matching, date inference, row validation
     depreciation.ts   MACRS engine; verified against the IRS optional tables
     assets.ts         stored assets -> schedules -> the line 14 figure
     report.ts         roll-up into Part I / Part II / line 34, and CSV
@@ -168,7 +207,7 @@ src/
   components/         UI, including the camera-capture receipt picker
   app/
     (auth)/           login, first-run owner setup
-    (app)/            dashboard, entries, hours, assets, report, settings
+    (app)/            dashboard, entries, hours, assets, import, report, settings
     api/receipts/     authenticated receipt image serving
   proxy.ts            redirects signed-out visitors (convenience only)
 ```

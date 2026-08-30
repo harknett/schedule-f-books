@@ -6,6 +6,7 @@ import {
   ChevronIcon,
   ClockIcon,
   TractorIcon,
+  UploadIcon,
 } from "@/components/icons";
 import { PageHeader } from "@/components/ui";
 
@@ -38,6 +39,13 @@ const CHOICES = [
     label: "Asset",
     body: "Machinery, buildings, or breeding stock to depreciate.",
     Icon: TractorIcon,
+    tone: "text-muted",
+  },
+  {
+    href: "/import",
+    label: "Import a CSV",
+    body: "A bank export, a spreadsheet, or a timesheet, all at once.",
+    Icon: UploadIcon,
     tone: "text-muted",
   },
 ] as const;

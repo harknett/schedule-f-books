@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { TransactionList } from "@/components/transaction-row";
-import { EmptyState, PageHeader, Stat } from "@/components/ui";
+import { ButtonLink, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
 import { currentYear } from "@/lib/dates";
@@ -69,7 +69,15 @@ export default async function TransactionsPage({
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Books" subtitle={`${total} ${total === 1 ? "entry" : "entries"} in ${year}`} />
+      <PageHeader
+        title="Books"
+        subtitle={`${total} ${total === 1 ? "entry" : "entries"} in ${year}`}
+        action={
+          <ButtonLink href="/import" variant="secondary">
+            Import
+          </ButtonLink>
+        }
+      />
 
       {totals.length > 0 ? (
         <div className="grid grid-cols-2 gap-3">

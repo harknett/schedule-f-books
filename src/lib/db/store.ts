@@ -448,6 +448,57 @@ export class Store {
     return num(row.n);
   }
 
+  // --- bulk import ---------------------------------------------------------
+
+  /**
+   * Run a unit of work inside a database transaction, so a failed import
+   * leaves the books exactly as it found them rather than half-written.
+   */
+  transaction<T>(work: () => T): T {
+    this.db.exec("BEGIN");
+    try {
+      const result = work();
+      this.db.exec("COMMIT");
+      return result;
+    } catch (err) {
+      this.db.exec("ROLLBACK");
+      throw err;
+    }
+  }
+
+  /** Existing transactions in a date range, as the fields duplicate keys compare. */
+  transactionFingerprints(
+    from: string,
+    to: string,
+  ): Array<{ kind: string; date: string; amount: number; payee: string | null }> {
+    const rows = this.db
+      .prepare("SELECT kind, date, amount, payee FROM transactions WHERE date BETWEEN ? AND ?")
+      .all(from, to) as Row[];
+    return rows.map((r) => ({
+      kind: str(r.kind),
+      date: str(r.date),
+      amount: num(r.amount),
+      payee: nstr(r.payee),
+    }));
+  }
+
+  timeEntryFingerprints(
+    userId: number,
+    from: string,
+    to: string,
+  ): Array<{ date: string; minutes: number; task: string }> {
+    const rows = this.db
+      .prepare(
+        "SELECT date, minutes, task FROM time_entries WHERE user_id = ? AND date BETWEEN ? AND ?",
+      )
+      .all(userId, from, to) as Row[];
+    return rows.map((r) => ({
+      date: str(r.date),
+      minutes: num(r.minutes),
+      task: str(r.task),
+    }));
+  }
+
   // --- assets --------------------------------------------------------------
 
   createAsset(input: NewAsset): Asset {

@@ -70,7 +70,8 @@ export function Field({
   htmlFor,
 }: {
   label: string;
-  hint?: string;
+  /** Takes markup as well as text, for hints that carry a link. */
+  hint?: ReactNode;
   children: ReactNode;
   htmlFor?: string;
 }) {
