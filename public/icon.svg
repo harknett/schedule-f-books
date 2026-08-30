@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Schedule F Books">
+  <rect width="512" height="512" rx="112" fill="#3f6212"/>
+  <g fill="none" stroke="#ecf5dc" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <!-- A ledger page, dog-eared, with a wheat stalk growing out of it. -->
+    <path d="M150 116h150l62 62v218a12 12 0 0 1-12 12H150a12 12 0 0 1-12-12V128a12 12 0 0 1 12-12z"/>
+    <path d="M300 116v62h62"/>
+    <path d="M256 356V236"/>
+    <path d="M256 268c-26 0-42-16-42-38 22 0 42 14 42 38z"/>
+    <path d="M256 268c26 0 42-16 42-38-22 0-42 14-42 38z"/>
+    <path d="M256 316c-26 0-42-16-42-38 22 0 42 14 42 38z"/>
+    <path d="M256 316c26 0 42-16 42-38-22 0-42 14-42 38z"/>
+  </g>
+</svg>

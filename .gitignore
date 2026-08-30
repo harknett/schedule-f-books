@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Your farm's books: the SQLite database and every receipt image.
+# Never commit these - back them up separately.
+/data/
+*.db
+*.db-shm
+*.db-wal
