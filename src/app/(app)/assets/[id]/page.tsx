@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { TrashIcon } from "@/components/icons";
+import { ReceiptGallery } from "@/components/receipt-gallery";
 import { Button, ButtonLink, Card, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guard";
 import { assetClassLabel, deductionFor, scheduleFor } from "@/lib/assets";
@@ -10,7 +11,7 @@ import { currentYear, prettyDate } from "@/lib/dates";
 import { CONVENTION_LABELS, METHOD_LABELS } from "@/lib/depreciation";
 import { formatUsd } from "@/lib/money";
 
-import { deleteAsset } from "../actions";
+import { deleteAsset, deleteAssetReceipt } from "../actions";
 
 export const metadata = { title: "Asset · Schedule F Books" };
 
@@ -24,8 +25,11 @@ export default async function AssetDetailPage({
   const assetId = Number(id);
   if (!Number.isInteger(assetId)) notFound();
 
-  const asset = getStore().getAsset(assetId);
+  const store = getStore();
+  const asset = store.getAsset(assetId);
   if (!asset) notFound();
+
+  const receipts = store.listAssetReceipts(assetId);
 
   const schedule = scheduleFor(asset);
   const thisYear = currentYear();
@@ -82,6 +86,19 @@ export default async function AssetDetailPage({
           {asset.notes ? <Row label="Notes">{asset.notes}</Row> : null}
         </dl>
       </Card>
+
+      <section className="space-y-3">
+        <h2 className="font-semibold">
+          Paperwork{receipts.length > 0 ? ` (${receipts.length})` : ""}
+        </h2>
+        <ReceiptGallery
+          receipts={receipts}
+          ownerField="assetId"
+          ownerId={assetId}
+          onDelete={deleteAssetReceipt}
+          emptyMessage="No bill of sale or invoice attached. You can add one from Edit."
+        />
+      </section>
 
       <section className="space-y-3">
         <h2 className="font-semibold">Depreciation schedule</h2>

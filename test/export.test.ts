@@ -9,6 +9,7 @@ import { parseCsv } from "@/lib/csv";
 import { Store } from "@/lib/db/store";
 import type { Receipt, TransactionWithMeta } from "@/lib/db/types";
 import {
+  assetReceiptArchiveName,
   buildExportEntries,
   exportFileName,
   receiptArchiveName,
@@ -91,6 +92,9 @@ function buildInput(
     transactions,
     receiptsByTransaction,
     assets: store.listAssets(),
+    receiptsByAsset: new Map(
+      store.listAssets().map((a) => [a.id, store.listAssetReceipts(a.id)]),
+    ),
     timeEntries: store.listTimeEntriesInRange(from, to, userId),
     receiptFiles: [],
     includeReceipts: true,
@@ -302,6 +306,29 @@ describe("receipts", () => {
 
     // transactions.csv points at the file by its archive name.
     expect(files.get("transactions.csv")).toContain(name);
+  });
+
+  it("carries an asset's paperwork, named apart from transaction receipts", () => {
+    const asset = store.listAssets()[0]!;
+    store.createReceipt({
+      assetId: asset.id,
+      filename: "bill-of-sale.pdf",
+      mimeType: "application/pdf",
+      byteSize: 9,
+    });
+
+    const input = buildInput("2026-01-01", "2026-12-31");
+    const name = assetReceiptArchiveName(asset.id, 0, "bill-of-sale.pdf");
+    expect(name).toBe("receipts/asset-000001-1.pdf");
+    input.receiptFiles = [{ name, data: Buffer.from("bill data") }];
+
+    const files = exportAndExtract(input);
+    expect(files.get(name)).toBe("bill data");
+
+    // assets.csv points at it, and archive.json records it too.
+    expect(files.get("assets.csv")).toContain(name);
+    const archive = JSON.parse(files.get("archive.json")!);
+    expect(archive.assets[0].receipts[0].file).toBe(name);
   });
 
   it("are omitted when asked, and the CSV then claims no files", () => {

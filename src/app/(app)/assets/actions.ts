@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
+import { deleteReceiptFile, saveReceiptFile } from "@/lib/receipts";
 import type { NewAsset } from "@/lib/db/types";
 import { requireIsoDate } from "@/lib/dates";
 import { requireAssetClass, type Convention, type DepreciationMethod } from "@/lib/depreciation";
@@ -94,6 +95,16 @@ function readAsset(formData: FormData): Omit<NewAsset, "createdBy"> {
   };
 }
 
+/** Attach every non-empty file under `receipts` to an asset. */
+async function attachReceipts(formData: FormData, assetId: number): Promise<void> {
+  const files = formData.getAll("receipts").filter((f): f is File => f instanceof File && f.size > 0);
+  const store = getStore();
+  for (const file of files) {
+    const saved = await saveReceiptFile(file);
+    store.createReceipt({ assetId, ...saved });
+  }
+}
+
 function revalidateAll(id?: number): void {
   revalidatePath("/");
   revalidatePath("/assets");
@@ -111,6 +122,7 @@ export async function createAsset(
   try {
     const created = getStore().createAsset({ ...readAsset(formData), createdBy: user.id });
     id = created.id;
+    await attachReceipts(formData, id);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not save the asset." };
   }
@@ -130,6 +142,7 @@ export async function updateAsset(
     const store = getStore();
     if (!store.getAsset(id)) return { error: "That asset no longer exists." };
     store.updateAsset(id, readAsset(formData));
+    await attachReceipts(formData, id);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not update the asset." };
   }
@@ -143,7 +156,22 @@ export async function deleteAsset(formData: FormData): Promise<void> {
   const id = Number(formData.get("id"));
   if (!Number.isInteger(id)) throw new Error("Invalid asset id.");
 
-  getStore().deleteAsset(id);
+  // Drop the row first, then the files its receipts referenced.
+  const filenames = getStore().deleteAsset(id);
+  await Promise.all(filenames.map((f) => deleteReceiptFile(f)));
+
   revalidateAll();
   redirect("/assets");
+}
+
+export async function deleteAssetReceipt(formData: FormData): Promise<void> {
+  await requireUser();
+  const receiptId = Number(formData.get("receiptId"));
+  const assetId = Number(formData.get("assetId"));
+  if (!Number.isInteger(receiptId)) throw new Error("Invalid receipt id.");
+
+  const filename = getStore().deleteReceipt(receiptId);
+  if (filename) await deleteReceiptFile(filename);
+
+  revalidatePath(`/assets/${assetId}`);
 }

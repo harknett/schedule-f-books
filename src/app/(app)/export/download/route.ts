@@ -4,6 +4,7 @@ import { currentUser } from "@/lib/auth/session";
 import { getStore } from "@/lib/db";
 import { isIsoDate } from "@/lib/dates";
 import {
+  assetReceiptArchiveName,
   buildExportEntries,
   exportFileName,
   receiptArchiveName,
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
   // Assets are not filtered by range: a tractor bought in 2019 still
   // depreciates into the years being exported.
   const assets = store.listAssets();
+  const receiptsByAsset = new Map(assets.map((a) => [a.id, store.listAssetReceipts(a.id)]));
 
   const timeEntries = store.listTimeEntriesInRange(
     from,
@@ -56,19 +58,28 @@ export async function GET(request: Request) {
 
   const receiptFiles: ZipEntry[] = [];
   if (includeReceipts) {
-    for (const [transactionId, receipts] of receiptsByTransaction) {
-      for (const [index, receipt] of receipts.entries()) {
-        try {
-          receiptFiles.push({
-            name: receiptArchiveName(transactionId, index, receipt.filename),
-            data: await readReceiptFile(receipt.filename),
-          });
-        } catch {
-          // A missing file should not sink the whole export; the CSV still
-          // records that a receipt was expected here.
+    // A missing file should not sink the whole export; the CSV still records
+    // that a receipt was expected there.
+    const collect = async (
+      owners: Map<number, Array<{ filename: string }>>,
+      nameFor: (ownerId: number, index: number, filename: string) => string,
+    ) => {
+      for (const [ownerId, receipts] of owners) {
+        for (const [index, receipt] of receipts.entries()) {
+          try {
+            receiptFiles.push({
+              name: nameFor(ownerId, index, receipt.filename),
+              data: await readReceiptFile(receipt.filename),
+            });
+          } catch {
+            /* skip a file that is no longer on disk */
+          }
         }
       }
-    }
+    };
+
+    await collect(receiptsByTransaction, receiptArchiveName);
+    await collect(receiptsByAsset, assetReceiptArchiveName);
   }
 
   const input: ExportInput = {
@@ -79,6 +90,7 @@ export async function GET(request: Request) {
     transactions,
     receiptsByTransaction,
     assets,
+    receiptsByAsset,
     timeEntries,
     receiptFiles,
     includeReceipts,

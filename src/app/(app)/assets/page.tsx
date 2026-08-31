@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { ChevronIcon } from "@/components/icons";
+import { ChevronIcon, ReceiptIcon } from "@/components/icons";
 import { ButtonLink, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guard";
 import { assetClassLabel, remainingBasis, summarizeYear } from "@/lib/assets";
@@ -66,6 +66,7 @@ export default async function AssetsPage({
             <ul className="card divide-y divide-[var(--border)] overflow-hidden p-0">
               {assets.map((asset) => {
                 const row = summary.rows.find((r) => r.asset.id === asset.id);
+                const paperwork = store.listAssetReceipts(asset.id).length;
                 const disposed =
                   asset.disposedDate && Number(asset.disposedDate.slice(0, 4)) <= year;
                 return (
@@ -87,6 +88,16 @@ export default async function AssetsPage({
                           {assetClassLabel(asset)} · placed {prettyDate(asset.placedInService)}
                         </p>
                       </div>
+                      {paperwork > 0 ? (
+                        <span
+                          className="flex items-center gap-0.5 text-xs text-muted"
+                          title={`${paperwork} document${paperwork === 1 ? "" : "s"} on file`}
+                        >
+                          <ReceiptIcon className="h-4 w-4" />
+                          {paperwork > 1 ? paperwork : null}
+                        </span>
+                      ) : null}
+
                       <div className="shrink-0 text-right">
                         <p className="tabular font-semibold">
                           {formatUsd(row?.deduction ?? 0)}

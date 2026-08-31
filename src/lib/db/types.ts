@@ -44,7 +44,9 @@ export interface NewTransaction {
 
 export interface Receipt {
   id: number;
-  transactionId: number;
+  /** Exactly one of these is set. */
+  transactionId: number | null;
+  assetId: number | null;
   filename: string;
   mimeType: string;
   byteSize: number;

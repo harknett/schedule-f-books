@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ReceiptIcon, TrashIcon } from "@/components/icons";
+import { TrashIcon } from "@/components/icons";
+import { ReceiptGallery } from "@/components/receipt-gallery";
 import { Button, ButtonLink, Card, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
@@ -76,50 +77,13 @@ export default async function TransactionDetailPage({
           Receipts{receipts.length > 0 ? ` (${receipts.length})` : ""}
         </h2>
 
-        {receipts.length === 0 ? (
-          <Card className="flex items-center gap-3 text-sm text-muted">
-            <ReceiptIcon className="h-5 w-5 shrink-0" />
-            <span>No receipt attached. You can add one from Edit.</span>
-          </Card>
-        ) : (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {receipts.map((receipt) => (
-              <li key={receipt.id} className="relative">
-                <a
-                  href={`/api/receipts/${receipt.id}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block aspect-square overflow-hidden rounded-xl border border-line bg-surface-muted"
-                >
-                  {receipt.mimeType.startsWith("image/") ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={`/api/receipts/${receipt.id}`}
-                      alt="Receipt"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="grid h-full place-items-center gap-1 text-muted">
-                      <ReceiptIcon className="h-8 w-8" />
-                      <span className="text-xs">PDF</span>
-                    </div>
-                  )}
-                </a>
-                <form action={deleteReceipt} className="absolute -right-1.5 -top-1.5">
-                  <input type="hidden" name="receiptId" value={receipt.id} />
-                  <input type="hidden" name="transactionId" value={transactionId} />
-                  <button
-                    type="submit"
-                    aria-label="Delete this receipt"
-                    className="grid h-7 w-7 place-items-center rounded-full bg-danger text-white shadow"
-                  >
-                    <TrashIcon className="h-3.5 w-3.5" />
-                  </button>
-                </form>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ReceiptGallery
+          receipts={receipts}
+          ownerField="transactionId"
+          ownerId={transactionId}
+          onDelete={deleteReceipt}
+          emptyMessage="No receipt attached. You can add one from Edit."
+        />
       </section>
 
       <div className="flex items-center justify-between pt-2">

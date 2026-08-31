@@ -90,4 +90,33 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX idx_assets_placed ON assets(placed_in_service);
   CREATE INDEX idx_assets_disposed ON assets(disposed_date);
   `,
+
+  // Let a receipt belong to an asset as well as to a transaction: a bill of
+  // sale for a tractor is the same kind of record as a feed store receipt.
+  //
+  // SQLite cannot relax a NOT NULL column in place, so the table is rebuilt.
+  // Existing rows carry over unchanged, keeping their ids - the files on disk
+  // and the export names are keyed by those.
+  `
+  CREATE TABLE receipts_rebuilt (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    transaction_id INTEGER REFERENCES transactions(id) ON DELETE CASCADE,
+    asset_id       INTEGER REFERENCES assets(id) ON DELETE CASCADE,
+    filename       TEXT NOT NULL,
+    mime_type      TEXT NOT NULL,
+    byte_size      INTEGER NOT NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    -- Exactly one owner, never both and never neither.
+    CHECK ((transaction_id IS NOT NULL) + (asset_id IS NOT NULL) = 1)
+  );
+
+  INSERT INTO receipts_rebuilt (id, transaction_id, filename, mime_type, byte_size, created_at)
+    SELECT id, transaction_id, filename, mime_type, byte_size, created_at FROM receipts;
+
+  DROP TABLE receipts;
+  ALTER TABLE receipts_rebuilt RENAME TO receipts;
+
+  CREATE INDEX idx_receipts_transaction ON receipts(transaction_id);
+  CREATE INDEX idx_receipts_asset ON receipts(asset_id);
+  `,
 ];

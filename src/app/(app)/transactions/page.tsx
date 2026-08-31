@@ -73,8 +73,9 @@ export default async function TransactionsPage({
         title="Books"
         subtitle={`${total} ${total === 1 ? "entry" : "entries"} in ${year}`}
         action={
-          <ButtonLink href="/import" variant="secondary">
-            Import
+          // Whatever list you are looking at, the button adds one of those.
+          <ButtonLink href={kind === "income" ? "/income/new" : "/expenses/new"}>
+            {kind === "income" ? "Add income" : "Add expense"}
           </ButtonLink>
         }
       />
@@ -96,12 +97,30 @@ export default async function TransactionsPage({
         />
 
         {years.length > 1 ? (
-          <div className="ml-auto flex gap-1.5">
+          <div className="flex gap-1.5">
             {years.map((y) => (
               <Filter key={y} href={query({ year: y, page: 1 })} active={y === year} label={String(y)} />
             ))}
           </div>
         ) : null}
+
+        <div className="ml-auto flex items-center gap-3 text-sm">
+          {kind ? (
+            <Link
+              href={kind === "income" ? "/expenses/new" : "/income/new"}
+              className="text-accent underline"
+            >
+              Add {kind === "income" ? "an expense" : "income"}
+            </Link>
+          ) : (
+            <Link href="/income/new" className="text-accent underline">
+              Add income
+            </Link>
+          )}
+          <Link href="/import" className="text-muted underline">
+            Import
+          </Link>
+        </div>
       </div>
 
       {transactions.length === 0 ? (

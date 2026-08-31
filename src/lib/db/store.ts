@@ -64,7 +64,8 @@ function mapTransaction(r: Row): TransactionWithMeta {
 function mapReceipt(r: Row): Receipt {
   return {
     id: num(r.id),
-    transactionId: num(r.transaction_id),
+    transactionId: nnum(r.transaction_id),
+    assetId: nnum(r.asset_id),
     filename: str(r.filename),
     mimeType: str(r.mime_type),
     byteSize: num(r.byte_size),
@@ -361,18 +362,26 @@ export class Store {
 
   // --- receipts ------------------------------------------------------------
 
+  /** Attach a receipt to a transaction or to an asset - exactly one. */
   createReceipt(input: {
-    transactionId: number;
+    transactionId?: number | null;
+    assetId?: number | null;
     filename: string;
     mimeType: string;
     byteSize: number;
   }): Receipt {
     const info = this.db
       .prepare(
-        `INSERT INTO receipts (transaction_id, filename, mime_type, byte_size)
-         VALUES (?, ?, ?, ?)`,
+        `INSERT INTO receipts (transaction_id, asset_id, filename, mime_type, byte_size)
+         VALUES (?, ?, ?, ?, ?)`,
       )
-      .run(input.transactionId, input.filename, input.mimeType, input.byteSize);
+      .run(
+        input.transactionId ?? null,
+        input.assetId ?? null,
+        input.filename,
+        input.mimeType,
+        input.byteSize,
+      );
     return this.getReceipt(Number(info.lastInsertRowid))!;
   }
 
@@ -385,6 +394,13 @@ export class Store {
     const rows = this.db
       .prepare("SELECT * FROM receipts WHERE transaction_id = ? ORDER BY id")
       .all(transactionId) as Row[];
+    return rows.map(mapReceipt);
+  }
+
+  listAssetReceipts(assetId: number): Receipt[] {
+    const rows = this.db
+      .prepare("SELECT * FROM receipts WHERE asset_id = ? ORDER BY id")
+      .all(assetId) as Row[];
     return rows.map(mapReceipt);
   }
 
@@ -563,8 +579,11 @@ export class Store {
     return this.getAsset(id);
   }
 
-  deleteAsset(id: number): void {
+  /** Deletes the asset and cascades its receipts. Returns filenames to unlink. */
+  deleteAsset(id: number): string[] {
+    const files = this.listAssetReceipts(id).map((r) => r.filename);
     this.db.prepare("DELETE FROM assets WHERE id = ?").run(id);
+    return files;
   }
 
   listAssets(): Asset[] {

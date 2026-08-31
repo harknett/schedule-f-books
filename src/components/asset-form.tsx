@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useFormStatus } from "react-dom";
 
+import { ReceiptPicker } from "./receipt-picker";
 import { Button, Card, ErrorBanner, Field, Input, Select, Textarea } from "./ui";
 import type { AssetFormState } from "@/app/(app)/assets/actions";
 import type { Asset } from "@/lib/db/types";
@@ -267,6 +268,13 @@ export function AssetForm({
             </p>
           </div>
         ) : null}
+
+        <Field
+          label={existing ? "Add more paperwork" : "Paperwork"}
+          hint="Bill of sale, invoice, or finance agreement. Kept with the asset."
+        >
+          <ReceiptPicker />
+        </Field>
 
         <details className="rounded-xl border border-line px-4 py-3">
           <summary className="cursor-pointer text-sm font-medium">

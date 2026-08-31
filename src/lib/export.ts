@@ -42,6 +42,8 @@ export interface ExportInput {
   transactions: TransactionWithMeta[];
   receiptsByTransaction: Map<number, Receipt[]>;
   assets: Asset[];
+  /** Bills of sale and invoices filed against an asset. */
+  receiptsByAsset: Map<number, Receipt[]>;
   timeEntries: ExportTimeEntry[];
   /** Already-loaded receipt files, named as they appear in the archive. */
   receiptFiles: ZipEntry[];
@@ -63,8 +65,21 @@ export function yearsInRange(from: string, to: string): number[] {
  * glance, and sorts sensibly. ASCII only, because Info-ZIP mangles UTF-8 names.
  */
 export function receiptArchiveName(transactionId: number, index: number, filename: string): string {
+  return archiveName("txn", transactionId, index, filename);
+}
+
+/** The same, for paperwork filed against an asset. */
+export function assetReceiptArchiveName(
+  assetId: number,
+  index: number,
+  filename: string,
+): string {
+  return archiveName("asset", assetId, index, filename);
+}
+
+function archiveName(prefix: string, ownerId: number, index: number, filename: string): string {
   const extension = /\.[a-z0-9]+$/i.exec(filename)?.[0].toLowerCase() ?? "";
-  return `receipts/txn-${String(transactionId).padStart(6, "0")}-${index + 1}${extension}`;
+  return `receipts/${prefix}-${String(ownerId).padStart(6, "0")}-${index + 1}${extension}`;
 }
 
 export function transactionsCsv(input: ExportInput): string {
@@ -110,7 +125,11 @@ export function transactionsCsv(input: ExportInput): string {
   return toCsv(rows);
 }
 
-export function assetsCsv(assets: Asset[]): string {
+export function assetsCsv(
+  assets: Asset[],
+  receiptsByAsset?: Map<number, Receipt[]>,
+  includePaperwork = true,
+): string {
   const rows: CsvRow[] = [
     [
       "id",
@@ -129,11 +148,13 @@ export function assetsCsv(assets: Asset[]): string {
       "disposed_date",
       "disposal_proceeds",
       "notes",
+      "paperwork",
     ],
   ];
 
   for (const asset of assets) {
     const schedule = scheduleFor(asset);
+    const paperwork = receiptsByAsset?.get(asset.id) ?? [];
     rows.push([
       String(asset.id),
       asset.name,
@@ -151,6 +172,9 @@ export function assetsCsv(assets: Asset[]): string {
       asset.disposedDate ?? "",
       asset.disposalProceeds != null ? dollars(asset.disposalProceeds) : "",
       asset.notes ?? "",
+      includePaperwork
+        ? paperwork.map((r, i) => assetReceiptArchiveName(asset.id, i, r.filename)).join(" ")
+        : "",
     ]);
   }
   return toCsv(rows);
@@ -278,6 +302,14 @@ export function archiveJson(input: ExportInput): string {
             disposedDate: asset.disposedDate,
             disposalProceedsCents: asset.disposalProceeds,
             notes: asset.notes,
+            receipts: (input.receiptsByAsset.get(asset.id) ?? []).map((r, i) => ({
+              id: r.id,
+              file: input.includeReceipts
+                ? assetReceiptArchiveName(asset.id, i, r.filename)
+                : null,
+              mimeType: r.mimeType,
+              byteSize: r.byteSize,
+            })),
             schedule: schedule.years.map((y) => ({
               year: y.year,
               amountCents: y.amount,
@@ -339,7 +371,7 @@ export function readmeText(input: ExportInput, years: number[]): string {
   if (input.includeReceipts && receiptCount > 0) {
     contents.push([
       "receipts/",
-      "Receipt images, named txn-<id>-<n> to match transactions.csv.",
+      "Images: txn-<id>-<n> for entries, asset-<id>-<n> for asset paperwork.",
     ]);
   }
   if (input.includeArchiveJson) {
@@ -435,7 +467,9 @@ export function buildExportEntries(input: ExportInput): ZipEntry[] {
   }
 
   add("transactions.csv", transactionsCsv(input));
-  if (input.assets.length > 0) add("assets.csv", assetsCsv(input.assets));
+  if (input.assets.length > 0) {
+    add("assets.csv", assetsCsv(input.assets, input.receiptsByAsset, input.includeReceipts));
+  }
   if (input.timeEntries.length > 0) add("hours.csv", hoursCsv(input.timeEntries));
   if (input.includeArchiveJson) add("archive.json", archiveJson(input));
   if (input.includeReceipts) {
