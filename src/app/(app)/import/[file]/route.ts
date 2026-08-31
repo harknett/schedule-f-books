@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { currentUser } from "@/lib/auth/session";
+import { requireApiUser } from "@/lib/auth/guard";
 import { templateFor, type ImportKind } from "@/lib/import";
 
 const KINDS: ImportKind[] = ["expense", "income", "time"];
@@ -10,9 +10,8 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ file: string }> },
 ) {
-  if (!(await currentUser())) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+  const auth = await requireApiUser();
+  if (auth.response) return auth.response;
 
   const { file } = await params;
   const match = /^([a-z]+)-template\.csv$/.exec(file);

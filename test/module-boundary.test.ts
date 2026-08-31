@@ -155,8 +155,10 @@ describe("client/server module boundary", () => {
   });
 
   it("every module using a node: builtin is server-only or reached only through one", () => {
-    // lib/db/store.ts is reached only via lib/db/index.ts, which is server-only.
-    const EXEMPT = new Set(["src/lib/db/store.ts"]);
+    // Both are deliberately unguarded so the maintenance CLI can import them
+    // without the server-only stub throwing, and neither is reachable from a
+    // client component - the two tests above are what prove that.
+    const EXEMPT = new Set(["src/lib/db/store.ts", "src/lib/db/paths.ts"]);
 
     const unguarded = ALL_FILES.filter((file) => {
       if (EXEMPT.has(rel(file))) return false;

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { currentUser } from "@/lib/auth/session";
@@ -18,12 +17,11 @@ export default async function LoginPage() {
   return (
     <>
       <SignInForm />
-      <p className="text-center text-xs text-muted">
-        No account?{" "}
-        <Link href="/register" className="underline">
-          Farm owners set up accounts
-        </Link>{" "}
-        from Settings.
+      <p className="text-center text-xs text-muted leading-relaxed">
+        Forgotten your password? The farm owner can reset it from Settings.
+        <br />
+        If you are the owner, run <code className="font-mono">npm run set-password</code> on the
+        machine this is running on.
       </p>
     </>
   );

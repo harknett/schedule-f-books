@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { addUser, changePassword, type SettingsState } from "./actions";
+import { addUser, changePassword, resetUserPassword, type ResetState, type SettingsState } from "./actions";
 import { Button, Card, ErrorBanner, Field, Input } from "@/components/ui";
 import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
 
@@ -109,5 +109,61 @@ export function AddUserForm() {
         <Submit label="Create account" />
       </form>
     </Card>
+  );
+}
+
+/**
+ * Reset one person's password.
+ *
+ * The generated password appears here once and nowhere else - it is not stored
+ * in the clear, so if it is lost the answer is another reset.
+ */
+export function ResetPasswordButton({
+  userId,
+  name,
+  isSelf,
+}: {
+  userId: number;
+  name: string;
+  isSelf: boolean;
+}) {
+  const [state, action] = useActionState<ResetState, FormData>(resetUserPassword, {});
+
+  if (state.temporaryPassword) {
+    return (
+      <div className="mt-2 rounded-xl border border-accent/40 bg-accent-soft p-3 space-y-1.5">
+        <p className="text-xs uppercase tracking-wide text-accent">
+          Temporary password for {state.forName}
+        </p>
+        <p className="font-mono text-lg font-semibold tracking-wide select-all">
+          {state.temporaryPassword}
+        </p>
+        <p className="text-xs text-muted">
+          Shown once. Give it to them directly — they will be asked to choose their own at sign-in,
+          and any device they were signed in on has been signed out.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form action={action} className="mt-1">
+      <input type="hidden" name="userId" value={userId} />
+      <ErrorBanner message={state.error} />
+      <ResetSubmit label={isSelf ? "Reset my password" : `Reset ${name.split(" ")[0]}'s password`} />
+    </form>
+  );
+}
+
+function ResetSubmit({ label }: { label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="text-xs text-muted underline hover:text-danger disabled:opacity-50"
+    >
+      {pending ? "Resetting…" : label}
+    </button>
   );
 }

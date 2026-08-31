@@ -1,28 +1,9 @@
 import "server-only";
 
-import fs from "node:fs";
-import path from "node:path";
-
 import { Store } from "./store";
+import { dbFile, ensureDataDir } from "./paths";
 
-/**
- * Where the books live. Defaults to ./data so a self-hosted install is one
- * directory to back up; override with DATA_DIR when deploying.
- */
-export function dataDir(): string {
-  const configured = process.env.DATA_DIR?.trim();
-  return configured && configured !== ""
-    ? path.resolve(configured)
-    : path.join(process.cwd(), "data");
-}
-
-export function receiptsDir(): string {
-  return path.join(dataDir(), "receipts");
-}
-
-export function dbFile(): string {
-  return path.join(dataDir(), "books.db");
-}
+export { dataDir, dbFile, receiptsDir } from "./paths";
 
 // Next re-evaluates modules on hot reload; keep one connection per process.
 const globalForStore = globalThis as unknown as {
@@ -42,7 +23,7 @@ export function getStore(): Store {
   }
 
   globalForStore.__store?.close();
-  fs.mkdirSync(receiptsDir(), { recursive: true });
+  ensureDataDir();
   globalForStore.__store = new Store(dbFile());
   globalForStore.__storeClass = Store;
   return globalForStore.__store;

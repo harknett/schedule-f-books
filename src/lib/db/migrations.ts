@@ -171,4 +171,17 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE loans ADD COLUMN farm_use_percent REAL NOT NULL DEFAULT 100
     CHECK (farm_use_percent > 0 AND farm_use_percent <= 100);
   `,
+
+  // Accounts whose password somebody else knows.
+  //
+  // A password the owner typed for someone, or a temporary one from a reset,
+  // is not really that person's yet. The flag holds them at a change-password
+  // page until they pick their own.
+  //
+  // Existing accounts default to 0: those people chose their own passwords,
+  // and nothing about this change should lock them out.
+  `
+  ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0
+    CHECK (must_change_password IN (0, 1));
+  `,
 ];

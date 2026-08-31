@@ -43,6 +43,7 @@ function mapUser(r: Row): User {
     email: str(r.email),
     name: str(r.name),
     role: str(r.role) as UserRole,
+    mustChangePassword: num(r.must_change_password) === 1,
     createdAt: str(r.created_at),
   };
 }
@@ -185,10 +186,21 @@ export class Store {
     name: string;
     passwordHash: string;
     role: UserRole;
+    /** Set when somebody else chose the password, e.g. an owner adding a member. */
+    mustChangePassword?: boolean;
   }): User {
     const info = this.db
-      .prepare("INSERT INTO users (email, name, password_hash, role) VALUES (?, ?, ?, ?)")
-      .run(input.email.toLowerCase(), input.name, input.passwordHash, input.role);
+      .prepare(
+        `INSERT INTO users (email, name, password_hash, role, must_change_password)
+         VALUES (?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.email.toLowerCase(),
+        input.name,
+        input.passwordHash,
+        input.role,
+        input.mustChangePassword ? 1 : 0,
+      );
     return this.getUser(Number(info.lastInsertRowid))!;
   }
 
@@ -210,8 +222,16 @@ export class Store {
     return rows.map(mapUser);
   }
 
-  setPassword(userId: number, passwordHash: string): void {
-    this.db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(passwordHash, userId);
+  /**
+   * Replace a password.
+   *
+   * `mustChange` says whether the new password is the account holder's own
+   * choice (false) or one somebody else set for them (true).
+   */
+  setPassword(userId: number, passwordHash: string, mustChange = false): void {
+    this.db
+      .prepare("UPDATE users SET password_hash = ?, must_change_password = ? WHERE id = ?")
+      .run(passwordHash, mustChange ? 1 : 0, userId);
   }
 
   // --- sessions ------------------------------------------------------------

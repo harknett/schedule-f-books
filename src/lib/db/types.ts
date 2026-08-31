@@ -9,6 +9,12 @@ export interface User {
   email: string;
   name: string;
   role: UserRole;
+  /**
+   * True while the account still carries a password somebody else set - a new
+   * account, or one that has just been reset. Every page is held until it is
+   * changed.
+   */
+  mustChangePassword: boolean;
   createdAt: string;
 }
 

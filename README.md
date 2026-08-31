@@ -34,7 +34,8 @@ afterthought.
   copy for archiving. See [Exporting](#exporting).
 - **Schedule F report** for any year, on screen or as CSV for your preparer.
 - **Multiple accounts** sharing one set of farm books. Hours stay personal to
-  whoever logged them.
+  whoever logged them. See [Accounts and passwords](#accounts-and-passwords)
+  for what to do when somebody is locked out.
 
 ## Requirements
 
@@ -203,6 +204,43 @@ It does not compute depreciation recapture on sale, handle ADS elections or
 listed-property recapture, or produce Form 4562. Check the schedule against
 the current year's instructions.
 
+## Accounts and passwords
+
+The first account created is the farm owner. After that the owner adds people
+from **Settings**, handing over the password directly.
+
+An account holding a password somebody else chose — a new account, or one just
+reset — is held at a change-password screen until it picks its own. Nothing
+else in the app is reachable until then, including the export and the receipt
+images.
+
+**Somebody forgot their password.** The owner resets it from Settings. A
+temporary password is generated and shown once, that account is signed out
+everywhere, and they choose their own at next sign-in. If the temporary one is
+lost, reset again — it is never stored in a form anyone can read back.
+
+**The owner forgot theirs.** Nobody in the app can help, so recover from the
+machine it runs on:
+
+```bash
+npm run set-password -- owner@farm.test
+```
+
+It prints a temporary password once, ends every session that account had, and
+asks for a new password at sign-in. Set `DATA_DIR` if the books are not in
+`./data`.
+
+Authorisation there is access to the machine and the data directory, which is
+the right boundary for a self-hosted app — and adds no exposure: anyone who can
+run that command can already open `books.db` and read every figure in it. The
+lock is on the machine, not on the app.
+
+There is deliberately **no emailed reset link**. It would mean SMTP
+credentials, a provider, and deliverability for a farm where the owner is
+usually within earshot. If this is ever deployed for people who cannot be
+handed a password directly, that is when an emailed single-use token becomes
+worth building.
+
 ## Your data
 
 Everything lives in one directory — the SQLite database and every receipt
@@ -247,11 +285,12 @@ Have a preparer review it before you file.
 ## Development
 
 ```bash
-npm run dev        # dev server
-npm test           # vitest
-npm run typecheck  # tsc --noEmit
-npm run lint       # eslint
-npm run build      # production build
+npm run dev            # dev server
+npm test               # vitest
+npm run typecheck      # tsc --noEmit
+npm run lint           # eslint
+npm run build          # production build
+npm run set-password   # reset an account's password from the command line
 ```
 
 Layout:
@@ -271,7 +310,9 @@ src/
     money.ts          integer cents; no floats touch an amount
     duration.ts       parsing and formatting time worked
     db/               SQLite store, migrations, row mapping
-    auth/             scrypt hashing, session cookies, requireUser()
+    auth/             scrypt hashing, session cookies, and the two gates:
+                      requireUser (signed in, password is their own) and
+                      requireApiUser (the same, for route handlers)
     receipts.ts       receipt files on disk (server only)
     receipt-limits.ts size/type limits shared with the browser
   components/         UI, including the camera-capture receipt picker
@@ -288,9 +329,11 @@ the only conversion points, and they are covered by tests. Time is whole
 minutes. Depreciation schedules are derived from the asset's inputs on every
 read rather than stored, so correcting a cost or a class re-runs cleanly.
 
-Access is enforced server-side by `requireUser()` in every page and action —
-`proxy.ts` only saves a render, and cannot be trusted on its own because it
-sees whether a cookie exists, not whether it is valid.
+Access is enforced server-side by `requireUser()` in every page and action, and
+`requireApiUser()` in every route handler — `proxy.ts` only saves a render, and
+cannot be trusted on its own because it sees whether a cookie exists, not
+whether it is valid. Both gates check two things: signed in, and holding a
+password of their own.
 
 ## License
 

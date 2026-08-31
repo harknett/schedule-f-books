@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { currentUser } from "@/lib/auth/session";
+import { requireApiUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
 import { readReceiptFile } from "@/lib/receipts";
 
@@ -14,9 +14,8 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!(await currentUser())) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+  const auth = await requireApiUser();
+  if (auth.response) return auth.response;
 
   const { id } = await params;
   const receiptId = Number(id);

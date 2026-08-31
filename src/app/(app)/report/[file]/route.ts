@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { summarizeYear } from "@/lib/assets";
 import { interestForYear } from "@/lib/loans";
-import { currentUser } from "@/lib/auth/session";
+import { requireApiUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
 import { buildReport, reportToCsv } from "@/lib/report";
 
@@ -11,9 +11,8 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ file: string }> },
 ) {
-  if (!(await currentUser())) {
-    return new NextResponse("Unauthorized", { status: 401 });
-  }
+  const auth = await requireApiUser();
+  if (auth.response) return auth.response;
 
   const { file } = await params;
   const match = /^(\d{4})\.csv$/.exec(file);

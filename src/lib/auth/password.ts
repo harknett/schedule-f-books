@@ -1,6 +1,6 @@
 import "server-only";
 
-import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
+import { randomBytes, randomInt, scrypt, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
 
 import { MIN_PASSWORD_LENGTH, validatePassword } from "./password-policy";
@@ -57,4 +57,26 @@ export async function verifyPassword(password: string, encoded: string): Promise
     options,
   );
   return derived.length === expected.length && timingSafeEqual(derived, expected);
+}
+
+/**
+ * Characters for a temporary password.
+ *
+ * No i, l, 1, o, 0 - a temporary password gets read aloud across a yard or
+ * written on a scrap of paper, and those are the pairs people get wrong.
+ */
+const READABLE = "abcdefghjkmnpqrstuvwxyz23456789";
+
+/**
+ * A one-time password for a new account or a reset.
+ *
+ * 12 characters from a 31-character alphabet is about 59 bits, which is ample
+ * for a password that must be changed at next sign-in. Grouped with dashes so
+ * it can be read out without losing your place.
+ */
+export function generateTemporaryPassword(): string {
+  const chars = Array.from({ length: 12 }, () => READABLE[randomInt(READABLE.length)]);
+  return [chars.slice(0, 4), chars.slice(4, 8), chars.slice(8)]
+    .map((group) => group.join(""))
+    .join("-");
 }

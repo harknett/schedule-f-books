@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth/guard";
 import { dataDir, getStore } from "@/lib/db";
 import { prettyDate } from "@/lib/dates";
 
-import { AddUserForm, ChangePasswordForm } from "./forms";
+import { AddUserForm, ChangePasswordForm, ResetPasswordButton } from "./forms";
 
 export const metadata = { title: "Settings · Schedule F Books" };
 
@@ -36,17 +36,35 @@ export default async function SettingsPage() {
         <h2 className="font-semibold">People with access ({users.length})</h2>
         <ul className="card divide-y divide-[var(--border)] overflow-hidden p-0">
           {users.map((person) => (
-            <li key={person.id} className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">
-                  {person.name}
-                  {person.id === user.id ? <span className="text-muted"> (you)</span> : null}
-                </p>
-                <p className="truncate text-xs text-muted">{person.email}</p>
+            <li key={person.id} className="px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">
+                    {person.name}
+                    {person.id === user.id ? <span className="text-muted"> (you)</span> : null}
+                  </p>
+                  <p className="truncate text-xs text-muted">{person.email}</p>
+                </div>
+                {person.mustChangePassword ? (
+                  <span
+                    className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-xs text-accent"
+                    title="Still using a password someone else set"
+                  >
+                    must set password
+                  </span>
+                ) : null}
+                <span className="shrink-0 rounded-full bg-surface-muted px-2.5 py-1 text-xs text-muted">
+                  {person.role}
+                </span>
               </div>
-              <span className="shrink-0 rounded-full bg-surface-muted px-2.5 py-1 text-xs text-muted">
-                {person.role}
-              </span>
+
+              {user.role === "owner" ? (
+                <ResetPasswordButton
+                  userId={person.id}
+                  name={person.name}
+                  isSelf={person.id === user.id}
+                />
+              ) : null}
             </li>
           ))}
         </ul>

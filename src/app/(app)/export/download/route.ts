@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { currentUser } from "@/lib/auth/session";
+import { requireApiUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
 import { isIsoDate } from "@/lib/dates";
 import {
@@ -20,8 +20,9 @@ import { createZip, type ZipEntry } from "@/lib/zip";
  * download, and so the same URL can be fetched by a backup script.
  */
 export async function GET(request: Request) {
-  const user = await currentUser();
-  if (!user) return new NextResponse("Unauthorized", { status: 401 });
+  const auth = await requireApiUser();
+  if (auth.response) return auth.response;
+  const user = auth.user;
 
   const params = new URL(request.url).searchParams;
   const from = params.get("from") ?? "";
