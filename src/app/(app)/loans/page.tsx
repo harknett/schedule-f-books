@@ -55,7 +55,7 @@ export default async function LoansPage() {
           ) : null}
 
           <ul className="card divide-y divide-[var(--border)] overflow-hidden p-0">
-            {summaries.map(({ loan, balance, interestInYear }) => (
+            {summaries.map(({ loan, balance, deductibleInYear }) => (
               <li key={loan.id}>
                 <Link
                   href={`/loans/${loan.id}`}
@@ -73,13 +73,14 @@ export default async function LoansPage() {
                     <p className="truncate text-xs text-muted">
                       {loan.lender ? `${loan.lender} · ` : ""}line {LOAN_KIND_LINES[loan.kind]} ·{" "}
                       {formatUsd(balance)} owed
+                      {loan.farmUsePercent < 100 ? ` · ${loan.farmUsePercent}% farm` : ""}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="tabular font-semibold text-expense">
-                      {formatUsd(interestInYear)}
+                      {formatUsd(deductibleInYear)}
                     </p>
-                    <p className="text-xs text-muted">{year} interest</p>
+                    <p className="text-xs text-muted">{year} deductible</p>
                   </div>
                   <ChevronIcon className="h-5 w-5 shrink-0 text-muted" />
                 </Link>
@@ -90,8 +91,9 @@ export default async function LoansPage() {
       )}
 
       <p className="text-xs text-muted leading-relaxed">
-        Only interest is deductible. Principal is the money you borrowed going back, and escrow —
-        property tax or insurance the lender collects — belongs on its own line, not on 21.
+        Only interest is deductible, and only the farm-use share of it. Principal is the money you
+        borrowed going back, and escrow — property tax or insurance the lender collects — belongs
+        on its own line, not on 21.
       </p>
     </div>
   );

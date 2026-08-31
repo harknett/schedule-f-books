@@ -4,6 +4,7 @@ import { Store } from "@/lib/db/store";
 import type { Loan, LoanPayment } from "@/lib/db/types";
 import {
   LOAN_KIND_LINES,
+  farmShare,
   interestForYear,
   paymentTotal,
   summarizeLoan,
@@ -256,5 +257,94 @@ describe("persistence", () => {
       "2026-03-15",
       "2026-01-15",
     ]);
+  });
+});
+
+describe("farm use percentage", () => {
+  it("defaults to the whole loan being the farm's", () => {
+    const loan = makeLoan();
+    expect(loan.farmUsePercent).toBe(100);
+  });
+
+  it("takes the share of an amount, to the cent", () => {
+    expect(farmShare(1_000_00, 100)).toBe(1_000_00);
+    expect(farmShare(1_000_00, 60)).toBe(600_00);
+    expect(farmShare(333_33, 33)).toBe(11_000); // 110.00, rounded
+    expect(farmShare(0, 60)).toBe(0);
+  });
+
+  it("deducts only the farm share, while recording the payment in full", () => {
+    const loan = makeLoan({ farmUsePercent: 60 });
+    store.addLoanPayment({ loanId: loan.id, date: "2026-03-01", interest: 1_000_00, principal: 500_00 });
+
+    const summary = summarizeLoan(loan, store.listLoanPayments(loan.id), 2026);
+    // The statement figure is kept whole...
+    expect(summary.interestInYear).toBe(1_000_00);
+    expect(summary.paid.interest).toBe(1_000_00);
+    // ...and only 60% is claimed.
+    expect(summary.deductibleInYear).toBe(600_00);
+    expect(summary.deductibleAllTime).toBe(600_00);
+  });
+
+  it("leaves principal and the balance alone", () => {
+    const loan = makeLoan({ principal: 100_000_00, farmUsePercent: 50 });
+    store.addLoanPayment({ loanId: loan.id, date: "2026-03-01", interest: 0, principal: 1_000_00 });
+
+    const summary = summarizeLoan(loan, store.listLoanPayments(loan.id), 2026);
+    expect(summary.paid.principal).toBe(1_000_00);
+    expect(summary.balance).toBe(99_000_00);
+  });
+
+  it("carries the share through to Schedule F", () => {
+    const mortgage = makeLoan({ kind: "mortgage", farmUsePercent: 60 });
+    const operating = makeLoan({ name: "Operating line", kind: "other", farmUsePercent: 100 });
+
+    store.addLoanPayment({ loanId: mortgage.id, date: "2026-03-01", interest: 1_000_00, principal: 0 });
+    store.addLoanPayment({ loanId: operating.id, date: "2026-03-01", interest: 250_00, principal: 0 });
+
+    const interest = interestForYear(store.listLoans(), store.listAllLoanPayments(), 2026);
+    expect(interest.mortgage).toBe(600_00); // 60% of 1,000
+    expect(interest.other).toBe(250_00); // untouched at 100%
+    expect(interest.total).toBe(850_00);
+
+    const report = buildReport(2026, [], { loanInterest: interest });
+    expect(report.expenses.find((l) => l.line === "21a")!.amount).toBe(600_00);
+    expect(report.totalExpenses).toBe(850_00);
+  });
+
+  it("rounds once per loan, not once per payment", () => {
+    const loan = makeLoan({ farmUsePercent: 33 });
+    for (const date of ["2026-01-01", "2026-02-01", "2026-03-01"]) {
+      store.addLoanPayment({ loanId: loan.id, date, interest: 10_01, principal: 0 });
+    }
+
+    const interest = interestForYear(store.listLoans(), store.listAllLoanPayments(), 2026);
+
+    // 30.03 x 33% = 9.9099 -> 9.91, which is what a preparer gets totalling the
+    // column and taking the share. Rounding each payment first gives 3.30
+    // three times, or 9.90 - a cent adrift.
+    expect(interest.mortgage).toBe(9_91);
+    expect(interest.mortgage).not.toBe(3 * farmShare(10_01, 33));
+  });
+
+  it("refuses a share outside 0 to 100 at the database boundary", () => {
+    expect(() => makeLoan({ farmUsePercent: 0 })).toThrow();
+    expect(() => makeLoan({ farmUsePercent: 150 })).toThrow();
+    expect(() => makeLoan({ farmUsePercent: -10 })).toThrow();
+  });
+
+  it("survives an edit", () => {
+    const loan = makeLoan({ farmUsePercent: 100 });
+    store.addLoanPayment({ loanId: loan.id, date: "2026-03-01", interest: 1_000_00, principal: 0 });
+
+    const updated = store.updateLoan(loan.id, {
+      name: loan.name, kind: loan.kind, principal: loan.principal, farmUsePercent: 40,
+    })!;
+    expect(updated.farmUsePercent).toBe(40);
+
+    // Correcting the share re-runs every year from the untouched payments.
+    const summary = summarizeLoan(updated, store.listLoanPayments(loan.id), 2026);
+    expect(summary.interestInYear).toBe(1_000_00);
+    expect(summary.deductibleInYear).toBe(400_00);
   });
 });

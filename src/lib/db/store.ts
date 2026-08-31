@@ -108,6 +108,7 @@ function mapLoan(r: Row): Loan {
     principal: num(r.principal),
     interestRate: nnum(r.interest_rate),
     startDate: nstr(r.start_date),
+    farmUsePercent: num(r.farm_use_percent),
     notes: nstr(r.notes),
     createdBy: nnum(r.created_by),
     createdAt: str(r.created_at),
@@ -503,8 +504,9 @@ export class Store {
   createLoan(input: NewLoan): Loan {
     const info = this.db
       .prepare(
-        `INSERT INTO loans (name, lender, kind, principal, interest_rate, start_date, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO loans
+           (name, lender, kind, principal, interest_rate, start_date, farm_use_percent, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.name,
@@ -513,6 +515,7 @@ export class Store {
         input.principal,
         input.interestRate ?? null,
         input.startDate ?? null,
+        input.farmUsePercent ?? 100,
         input.notes ?? null,
         input.createdBy ?? null,
       );
@@ -529,7 +532,7 @@ export class Store {
       .prepare(
         `UPDATE loans
          SET name = ?, lender = ?, kind = ?, principal = ?, interest_rate = ?,
-             start_date = ?, notes = ?, updated_at = datetime('now')
+             start_date = ?, farm_use_percent = ?, notes = ?, updated_at = datetime('now')
          WHERE id = ?`,
       )
       .run(
@@ -539,6 +542,7 @@ export class Store {
         patch.principal,
         patch.interestRate ?? null,
         patch.startDate ?? null,
+        patch.farmUsePercent ?? 100,
         patch.notes ?? null,
         id,
       );

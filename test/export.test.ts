@@ -403,6 +403,33 @@ describe("loans", () => {
     expect(line21a[3]).toBe("400.00");
   });
 
+  it("shows both the interest paid and the deductible share", () => {
+    // Make the mortgage only 60% the farm's.
+    const mortgage = store.listLoans().find((l) => l.kind === "mortgage")!;
+    store.updateLoan(mortgage.id, {
+      name: mortgage.name, kind: mortgage.kind, principal: mortgage.principal,
+      farmUsePercent: 60,
+    });
+
+    const files = exportAndExtract(buildInput("2026-01-01", "2026-12-31"));
+    const rows = parseCsv(files.get("loans.csv")!);
+    const header = rows[0]!;
+    const row = rows.find((r) => r[1] === "North quarter mortgage")!;
+
+    expect(row[header.indexOf("farm_use_percent")]).toBe("60");
+    expect(row[header.indexOf("interest_paid_2026")]).toBe("400.00");
+    expect(row[header.indexOf("deductible_interest_2026")]).toBe("240.00");
+
+    // Only the deductible share reaches the form.
+    const scheduleF = parseCsv(files.get("schedule-f-2026.csv")!);
+    const line21a = scheduleF.find((r) => r[1] === "21a" && r[0]!.startsWith("Part II"))!;
+    expect(line21a[3]).toBe("240.00");
+
+    // The payment itself is still recorded in full.
+    const payments = parseCsv(files.get("loan-payments.csv")!);
+    expect(payments[1]![4]).toBe("400.00");
+  });
+
   it("records loans losslessly in archive.json", () => {
     const files = exportAndExtract(buildInput("2026-01-01", "2026-12-31"));
     const archive = JSON.parse(files.get("archive.json")!);

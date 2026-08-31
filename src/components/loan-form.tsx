@@ -28,6 +28,11 @@ export function LoanForm({
 }) {
   const [state, formAction] = useActionState<LoanFormState, FormData>(action, {});
   const [kind, setKind] = useState<LoanKind>(existing?.kind ?? "mortgage");
+  const [farmUse, setFarmUse] = useState(String(existing?.farmUsePercent ?? 100));
+
+  const farmUseNumber = Number(farmUse);
+  const partlyPersonal =
+    Number.isFinite(farmUseNumber) && farmUseNumber > 0 && farmUseNumber < 100;
 
   return (
     <Card>
@@ -93,7 +98,7 @@ export function LoanForm({
           </Field>
         </div>
 
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-5 sm:grid-cols-3">
           <Field label="Interest rate %" htmlFor="interestRate" hint="For reference only.">
             <Input
               id="interestRate"
@@ -101,6 +106,21 @@ export function LoanForm({
               inputMode="decimal"
               placeholder="6.25"
               defaultValue={existing?.interestRate != null ? String(existing.interestRate) : ""}
+              className="tabular"
+            />
+          </Field>
+
+          <Field
+            label="Farm use %"
+            htmlFor="farmUsePercent"
+            hint="100 unless part of it is personal."
+          >
+            <Input
+              id="farmUsePercent"
+              name="farmUsePercent"
+              inputMode="decimal"
+              value={farmUse}
+              onChange={(e) => setFarmUse(e.target.value)}
               className="tabular"
             />
           </Field>
@@ -114,6 +134,14 @@ export function LoanForm({
             />
           </Field>
         </div>
+
+        {partlyPersonal ? (
+          <p className="rounded-xl border border-accent/40 bg-accent-soft px-3 py-2.5 text-sm text-accent">
+            {farmUseNumber}% of the interest on this loan will be deducted on line{" "}
+            {LOAN_KIND_LINES[kind]}. Record payments in full — the share is applied when the
+            deductible figure is worked out, so you can correct it later and every year re-runs.
+          </p>
+        ) : null}
 
         <Field label="Notes" htmlFor="notes">
           <Textarea id="notes" name="notes" rows={2} defaultValue={existing?.notes ?? ""} />

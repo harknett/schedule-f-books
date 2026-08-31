@@ -21,7 +21,14 @@ import { prettyDate } from "./dates";
 import { CONVENTION_LABELS, METHOD_LABELS } from "./depreciation";
 import { formatHours } from "./duration";
 import type { Cents } from "./money";
-import { LOAN_KIND_LABELS, LOAN_KIND_LINES, interestForYear, paymentTotal, summarizeLoan } from "./loans";
+import {
+  LOAN_KIND_LABELS,
+  LOAN_KIND_LINES,
+  farmShare,
+  interestForYear,
+  paymentTotal,
+  summarizeLoan,
+} from "./loans";
 import { buildReport, reportToCsv } from "./report";
 import { getCategory } from "./schedule-f";
 import type { ZipEntry } from "./zip";
@@ -249,10 +256,12 @@ export function loansCsv(loans: Loan[], payments: LoanPayment[], year: number): 
       "schedule_f_line",
       "borrowed",
       "interest_rate",
+      "farm_use_percent",
       "start_date",
       "principal_repaid",
       "interest_paid_all_time",
       `interest_paid_${year}`,
+      `deductible_interest_${year}`,
       "escrow_paid",
       "balance",
       "notes",
@@ -261,7 +270,7 @@ export function loansCsv(loans: Loan[], payments: LoanPayment[], year: number): 
 
   for (const loan of loans) {
     const mine = payments.filter((p) => p.loanId === loan.id);
-    const { paid, balance, interestInYear } = summarizeLoan(loan, mine, year);
+    const { paid, balance, interestInYear, deductibleInYear } = summarizeLoan(loan, mine, year);
     rows.push([
       String(loan.id),
       loan.name,
@@ -270,10 +279,12 @@ export function loansCsv(loans: Loan[], payments: LoanPayment[], year: number): 
       LOAN_KIND_LINES[loan.kind],
       dollars(loan.principal),
       loan.interestRate != null ? String(loan.interestRate) : "",
+      String(loan.farmUsePercent),
       loan.startDate ?? "",
       dollars(paid.principal),
       dollars(paid.interest),
       dollars(interestInYear),
+      dollars(deductibleInYear),
       dollars(paid.escrow),
       dollars(balance),
       loan.notes ?? "",
@@ -416,10 +427,12 @@ export function archiveJson(input: ExportInput): string {
             scheduleFLine: LOAN_KIND_LINES[loan.kind],
             borrowedCents: loan.principal,
             interestRate: loan.interestRate,
+            farmUsePercent: loan.farmUsePercent,
             startDate: loan.startDate,
             notes: loan.notes,
             principalRepaidCents: paid.principal,
             interestPaidCents: paid.interest,
+            deductibleInterestCents: farmShare(paid.interest, loan.farmUsePercent),
             escrowPaidCents: paid.escrow,
             balanceCents: balance,
             payments: mine.map((p) => ({
@@ -457,9 +470,11 @@ export function readmeText(input: ExportInput, years: number[]): string {
     .reduce((sum, t) => sum + t.amount, 0);
   const minutes = input.timeEntries.reduce((sum, e) => sum + e.minutes, 0);
   const receiptCount = input.receiptFiles.length;
-  const loanInterest = input.loanPayments
-    .filter((p) => p.date >= input.from && p.date <= input.to)
-    .reduce((sum, p) => sum + p.interest, 0);
+  // The deductible figure, so it reconciles with lines 21a and 21b.
+  const loanInterest = years.reduce((sum, year) => {
+    const forYear = interestForYear(input.loans, input.loanPayments, year);
+    return sum + forYear.total;
+  }, 0);
 
   // Built as pairs and padded to the widest name, so the columns line up
   // whatever the years in the range make the filenames.
@@ -529,7 +544,7 @@ export function readmeText(input: ExportInput, years: number[]): string {
     `  Expenses             $${dollars(expenses)}   (before depreciation)`,
     `  Assets on register   ${input.assets.length}`,
     `  Loans on register    ${input.loans.length}`,
-    `  Interest paid        $${dollars(loanInterest)}   (lines 21a and 21b)`,
+    `  Deductible interest  $${dollars(loanInterest)}   (lines 21a and 21b)`,
     `  Hours logged         ${formatHours(minutes)}`,
     `  Receipt images       ${input.includeReceipts ? receiptCount : "not included"}`,
     "",
@@ -544,6 +559,9 @@ export function readmeText(input: ExportInput, years: number[]): string {
     "  * Lines 21a and 21b combine interest from recorded loan payments with",
     "    any interest entered by hand. Only interest is deductible: principal",
     "    and escrow in loan-payments.csv are shown for reconciliation only.",
+    "  * loan-payments.csv shows interest as paid. Where a loan is only partly",
+    "    the farm's, loans.csv carries the farm-use percentage and the",
+    "    deductible figure, and that is what reaches lines 21a and 21b.",
     "  * Taxable-amount lines (3b, 4b, 5c, 6b) are shown equal to the gross",
     "    amounts recorded. Elections and deferrals are not modelled, and",
     "    line 32 is a single bucket rather than 32a-32f.",

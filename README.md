@@ -120,6 +120,12 @@ lender holds for tax or insurance, which belongs on whichever line it is
 eventually spent against. The loan page tracks the balance down as principal is
 repaid.
 
+Where a loan is only partly the farm's — a farmhouse that is also a residence,
+or a truck used off the farm too — set its **farm use %**. Payments are still
+recorded in full as the statement reports them, and the share is applied when
+the deductible figure is worked out, so correcting the percentage later re-runs
+every year. The loan page shows both: what was paid, and what is deductible.
+
 Nothing is amortised from the interest rate. The split that reaches your return
 is the one on the statement, because that is the figure a preparer reconciles
 to and the one that appears on a Form 1098.
@@ -136,7 +142,7 @@ schedule-f-2026.csv     every Schedule F line for that tax year
 transactions.csv        every entry, each carrying its Schedule F line
 assets.csv              the depreciable asset register
 depreciation-2026.csv   per-asset working for Form 4562
-loans.csv               loans, interest paid, and what is still owed
+loans.csv               loans, interest paid, the deductible share, and what is owed
 loan-payments.csv       every payment split into interest/principal/escrow
 hours.csv               hours worked, in minutes and decimal hours
 receipts/               images: txn-<id>-<n> entries, asset-<id>-<n> assets
@@ -231,7 +237,8 @@ recorded — not a filable form, and not tax advice. Known simplifications:
   limits, bonus percentages, and recapture on sale are yours to verify - see
   [Depreciation](#depreciation).
 - Lines 21a and 21b combine interest from recorded loan payments with anything
-  entered by hand, and the report labels the line when both are present.
+  entered by hand, and the report labels the line when both are present. Only
+  the farm-use share of a loan's interest is claimed.
 - Line numbers follow the Schedule F layout but should be checked against the
   current year's form and instructions.
 

@@ -44,6 +44,15 @@ function readLoan(formData: FormData): Omit<NewLoan, "createdBy"> {
     }
   }
 
+  const farmUseRaw = optional(formData, "farmUsePercent");
+  let farmUsePercent = 100;
+  if (farmUseRaw != null) {
+    farmUsePercent = Number(farmUseRaw);
+    if (!Number.isFinite(farmUsePercent) || farmUsePercent <= 0 || farmUsePercent > 100) {
+      throw new Error("Farm use must be greater than 0 and at most 100 percent.");
+    }
+  }
+
   const startRaw = optional(formData, "startDate");
 
   return {
@@ -53,6 +62,7 @@ function readLoan(formData: FormData): Omit<NewLoan, "createdBy"> {
     principal,
     interestRate,
     startDate: startRaw ? requireIsoDate(startRaw, "Start date") : null,
+    farmUsePercent,
     notes: optional(formData, "notes"),
   };
 }

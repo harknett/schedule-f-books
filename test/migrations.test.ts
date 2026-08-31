@@ -143,6 +143,41 @@ describe("migrating a database that already has data", () => {
   });
 });
 
+describe("adding farm use to existing loans", () => {
+  it("defaults loans recorded before the column existed to 100%", () => {
+    // Everything up to but not including the farm-use migration.
+    const db = databaseAtVersion(MIGRATIONS.length - 1);
+    db.prepare(
+      "INSERT INTO loans (name,kind,principal) VALUES (?,?,?)",
+    ).run("Old mortgage", "mortgage", 100_000_00);
+    db.prepare(
+      "INSERT INTO loan_payments (loan_id,date,interest,principal) VALUES (?,?,?,?)",
+    ).run(1, "2026-01-15", 500_00, 200_00);
+
+    db.exec(MIGRATIONS[MIGRATIONS.length - 1]!);
+
+    const loan = db.prepare("SELECT * FROM loans WHERE id = 1").get() as Record<string, unknown>;
+    expect(loan.farm_use_percent).toBe(100);
+    expect(loan.name).toBe("Old mortgage");
+    // The payment is untouched.
+    const payment = db.prepare("SELECT * FROM loan_payments WHERE id = 1").get() as Record<string, unknown>;
+    expect(payment.interest).toBe(500_00);
+
+    db.close();
+  });
+
+  it("holds the share to a sensible range once the column exists", () => {
+    const db = databaseAtVersion(MIGRATIONS.length);
+    const insert = db.prepare(
+      "INSERT INTO loans (name,kind,principal,farm_use_percent) VALUES (?,?,?,?)",
+    );
+    expect(() => insert.run("bad", "mortgage", 100, 0)).toThrow();
+    expect(() => insert.run("bad", "mortgage", 100, 101)).toThrow();
+    expect(() => insert.run("fine", "mortgage", 100, 60)).not.toThrow();
+    db.close();
+  });
+});
+
 describe("a fresh database", () => {
   it("arrives at the current version with every table", () => {
     const store = new Store(":memory:");

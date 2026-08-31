@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ArrowDownIcon, ArrowUpIcon } from "@/components/icons";
 import { TransactionList } from "@/components/transaction-row";
 import { ButtonLink, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guard";
@@ -72,13 +73,19 @@ export default async function TransactionsPage({
       <PageHeader
         title="Books"
         subtitle={`${total} ${total === 1 ? "entry" : "entries"} in ${year}`}
-        action={
-          // Whatever list you are looking at, the button adds one of those.
-          <ButtonLink href={kind === "income" ? "/income/new" : "/expenses/new"}>
-            {kind === "income" ? "Add income" : "Add expense"}
-          </ButtonLink>
-        }
       />
+
+      {/* Both always here, whichever list is being viewed. */}
+      <div className="grid grid-cols-2 gap-3">
+        <ButtonLink href="/expenses/new" variant={kind === "income" ? "secondary" : "primary"}>
+          <ArrowUpIcon className="h-4.5 w-4.5" />
+          Add expense
+        </ButtonLink>
+        <ButtonLink href="/income/new" variant={kind === "income" ? "primary" : "secondary"}>
+          <ArrowDownIcon className="h-4.5 w-4.5" />
+          Add income
+        </ButtonLink>
+      </div>
 
       {totals.length > 0 ? (
         <div className="grid grid-cols-2 gap-3">
@@ -104,23 +111,9 @@ export default async function TransactionsPage({
           </div>
         ) : null}
 
-        <div className="ml-auto flex items-center gap-3 text-sm">
-          {kind ? (
-            <Link
-              href={kind === "income" ? "/expenses/new" : "/income/new"}
-              className="text-accent underline"
-            >
-              Add {kind === "income" ? "an expense" : "income"}
-            </Link>
-          ) : (
-            <Link href="/income/new" className="text-accent underline">
-              Add income
-            </Link>
-          )}
-          <Link href="/import" className="text-muted underline">
-            Import
-          </Link>
-        </div>
+        <Link href="/import" className="ml-auto text-sm text-muted underline">
+          Import
+        </Link>
       </div>
 
       {transactions.length === 0 ? (

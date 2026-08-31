@@ -30,7 +30,9 @@ export default async function LoanDetailPage({
 
   const payments = store.listLoanPayments(loanId);
   const year = currentYear();
-  const { paid, balance, interestInYear } = summarizeLoan(loan, payments, year);
+  const { paid, balance, interestInYear, deductibleInYear, deductibleAllTime } =
+    summarizeLoan(loan, payments, year);
+  const partlyPersonal = loan.farmUsePercent < 100;
 
   const repaidShare = loan.principal > 0 ? (paid.principal / loan.principal) * 100 : 0;
 
@@ -47,7 +49,12 @@ export default async function LoanDetailPage({
       />
 
       <div className="grid grid-cols-2 gap-3">
-        <Stat label={`${year} interest`} cents={interestInYear} tone="expense" small />
+        <Stat
+          label={partlyPersonal ? `${year} deductible` : `${year} interest`}
+          cents={deductibleInYear}
+          tone="expense"
+          small
+        />
         <Stat label="Still owed" cents={balance} small />
       </div>
 
@@ -60,7 +67,24 @@ export default async function LoanDetailPage({
               <span className="text-muted"> · {repaidShare.toFixed(1)}%</span>
             ) : null}
           </Row>
-          <Row label="Interest paid, all time">{formatUsd(paid.interest)}</Row>
+          <Row label={`Interest paid in ${year}`}>
+            {formatUsd(interestInYear)}
+            {partlyPersonal ? (
+              <span className="text-muted">
+                {" "}
+                · {formatUsd(deductibleInYear)} deductible at {loan.farmUsePercent}%
+              </span>
+            ) : null}
+          </Row>
+          <Row label="Interest paid, all time">
+            {formatUsd(paid.interest)}
+            {partlyPersonal ? (
+              <span className="text-muted"> · {formatUsd(deductibleAllTime)} deductible</span>
+            ) : null}
+          </Row>
+          {partlyPersonal ? (
+            <Row label="Farm use">{loan.farmUsePercent}% of this loan is the farm&rsquo;s</Row>
+          ) : null}
           {paid.escrow > 0 ? <Row label="Escrow paid">{formatUsd(paid.escrow)}</Row> : null}
           {loan.lender ? <Row label="Lender">{loan.lender}</Row> : null}
           {loan.interestRate != null ? <Row label="Rate">{loan.interestRate}%</Row> : null}
@@ -162,9 +186,13 @@ export default async function LoanDetailPage({
 
         <p className="text-xs text-muted leading-relaxed">
           Only the interest column is deductible, and it reaches Schedule F line{" "}
-          {LOAN_KIND_LINES[loan.kind]}. Principal repays what you borrowed and is not an expense;
-          escrow is money the lender holds for tax or insurance, which belongs on whichever line
-          it is eventually spent against.
+          {LOAN_KIND_LINES[loan.kind]}
+          {partlyPersonal
+            ? ` at ${loan.farmUsePercent}% — payments are recorded in full and the farm share is applied when the deductible figure is worked out`
+            : ""}
+          . Principal repays what you borrowed and is not an expense; escrow is money the lender
+          holds for tax or insurance, which belongs on whichever line it is eventually spent
+          against.
         </p>
       </section>
 

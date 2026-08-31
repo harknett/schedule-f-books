@@ -139,6 +139,12 @@ export interface Loan {
   /** Annual rate as a percentage. Informational; nothing is amortised from it. */
   interestRate: number | null;
   startDate: string | null;
+  /**
+   * The share of this loan that is the farm's, 0-100. Only that proportion of
+   * the interest is deductible. Applied when deriving, never to the stored
+   * payment.
+   */
+  farmUsePercent: number;
   notes: string | null;
   createdBy: number | null;
   createdAt: string;
@@ -152,6 +158,7 @@ export interface NewLoan {
   principal: Cents;
   interestRate?: number | null;
   startDate?: string | null;
+  farmUsePercent?: number;
   notes?: string | null;
   createdBy?: number | null;
 }

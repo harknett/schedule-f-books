@@ -157,4 +157,18 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX idx_loan_payments_loan ON loan_payments(loan_id);
   CREATE INDEX idx_loan_payments_date ON loan_payments(date);
   `,
+
+  // How much of a loan is the farm's.
+  //
+  // A note on a farmhouse that is part residence, or a truck used partly off
+  // the farm, is only deductible in proportion. The share is applied when the
+  // deductible figure is derived rather than baked into the stored payment, so
+  // each payment stays faithful to the lender's statement and correcting the
+  // percentage re-runs every year cleanly.
+  //
+  // Existing loans default to 100%, which is what they were before.
+  `
+  ALTER TABLE loans ADD COLUMN farm_use_percent REAL NOT NULL DEFAULT 100
+    CHECK (farm_use_percent > 0 AND farm_use_percent <= 100);
+  `,
 ];
