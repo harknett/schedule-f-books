@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guard";
 import { summarizeYear } from "@/lib/assets";
+import { interestForYear } from "@/lib/loans";
 import { getStore } from "@/lib/db";
 import { currentYear } from "@/lib/dates";
 import { formatUsd } from "@/lib/money";
@@ -28,8 +29,10 @@ export default async function ReportPage({
 
   const showAll = params.all === "1";
   const depreciation = summarizeYear(store.listAssets(), year);
+  const loanInterest = interestForYear(store.listLoans(), store.listAllLoanPayments(), year);
   const report = buildReport(year, store.categoryTotals(year), {
     assetDepreciation: depreciation.total,
+    loanInterest,
   });
 
   const visible = (lines: ReportLine[]) =>

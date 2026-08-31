@@ -95,6 +95,8 @@ function buildInput(
     receiptsByAsset: new Map(
       store.listAssets().map((a) => [a.id, store.listAssetReceipts(a.id)]),
     ),
+    loans: store.listLoans(),
+    loanPayments: store.listAllLoanPayments(from, to),
     timeEntries: store.listTimeEntriesInRange(from, to, userId),
     receiptFiles: [],
     includeReceipts: true,
@@ -348,6 +350,69 @@ describe("receipts", () => {
     const row = rows.find((r) => r[header.indexOf("payee")] === "Valley Co-op, Inc")!;
     expect(row[header.indexOf("receipts")]).toBe("1");
     expect(row[header.indexOf("receipt_files")]).toBe("");
+  });
+});
+
+describe("loans", () => {
+  beforeEach(() => {
+    const loan = store.createLoan({
+      name: "North quarter mortgage", lender: "Farm Credit", kind: "mortgage",
+      principal: 100_000_00, interestRate: 6.25, startDate: "2020-03-01", createdBy: userId,
+    });
+    store.createLoan({
+      name: "Operating line", kind: "other", principal: 20_000_00, createdBy: userId,
+    });
+    store.addLoanPayment({
+      loanId: loan.id, date: "2026-03-01",
+      interest: 400_00, principal: 800_00, escrow: 34_56, createdBy: userId,
+    });
+  });
+
+  it("ships the register and every payment", () => {
+    const files = exportAndExtract(buildInput("2026-01-01", "2026-12-31"));
+    expect(files.has("loans.csv")).toBe(true);
+    expect(files.has("loan-payments.csv")).toBe(true);
+
+    const loans = parseCsv(files.get("loans.csv")!);
+    const header = loans[0]!;
+    const mortgage = loans.find((r) => r[1] === "North quarter mortgage")!;
+
+    expect(mortgage[header.indexOf("schedule_f_line")]).toBe("21a");
+    expect(mortgage[header.indexOf("interest_paid_2026")]).toBe("400.00");
+    expect(mortgage[header.indexOf("balance")]).toBe("99200.00"); // 100,000 less 800
+  });
+
+  it("splits every payment and totals it", () => {
+    const files = exportAndExtract(buildInput("2026-01-01", "2026-12-31"));
+    const rows = parseCsv(files.get("loan-payments.csv")!);
+    const payment = rows[1]!;
+
+    expect(payment[4]).toBe("400.00"); // interest
+    expect(payment[5]).toBe("800.00"); // principal
+    expect(payment[6]).toBe("34.56"); // escrow
+    expect(payment[7]).toBe("1234.56"); // total
+
+    expect(rows.at(-1)![1]).toBe("TOTAL");
+    expect(rows.at(-1)![7]).toBe("1234.56");
+  });
+
+  it("puts only the interest on Schedule F line 21a", () => {
+    const files = exportAndExtract(buildInput("2026-01-01", "2026-12-31"));
+    const rows = parseCsv(files.get("schedule-f-2026.csv")!);
+    const line21a = rows.find((r) => r[1] === "21a" && r[0]!.startsWith("Part II"))!;
+    expect(line21a[3]).toBe("400.00");
+  });
+
+  it("records loans losslessly in archive.json", () => {
+    const files = exportAndExtract(buildInput("2026-01-01", "2026-12-31"));
+    const archive = JSON.parse(files.get("archive.json")!);
+
+    expect(archive.loans).toHaveLength(2);
+    const mortgage = archive.loans.find((l: { kind: string }) => l.kind === "mortgage");
+    expect(mortgage.scheduleFLine).toBe("21a");
+    expect(mortgage.borrowedCents).toBe(100_000_00);
+    expect(mortgage.balanceCents).toBe(99_200_00);
+    expect(mortgage.payments[0].totalCents).toBe(1_234_56);
   });
 });
 

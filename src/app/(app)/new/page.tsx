@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import {
   ArrowDownIcon,
+  BankIcon,
   ArrowUpIcon,
   ChevronIcon,
   ClockIcon,
@@ -39,6 +40,13 @@ const CHOICES = [
     label: "Asset",
     body: "Machinery, buildings, or breeding stock to depreciate.",
     Icon: TractorIcon,
+    tone: "text-muted",
+  },
+  {
+    href: "/loans/new",
+    label: "Loan",
+    body: "A mortgage or operating loan, to track interest paid.",
+    Icon: BankIcon,
     tone: "text-muted",
   },
   {

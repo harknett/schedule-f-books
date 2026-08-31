@@ -23,7 +23,10 @@ afterthought.
   `2:30`, `90m`), with a breakdown of where the time went.
 - **Asset depreciation** under MACRS, with a full year-by-year schedule that
   feeds Schedule F line 14 automatically. See
-  [Depreciation](#depreciation).
+  [Depreciation](#depreciation). Assets take paperwork of their own - a bill of
+  sale or finance agreement - alongside their schedule.
+- **Loans**, with each payment split into interest, principal, and escrow. The
+  interest reaches Schedule F line 21a or 21b on its own. See [Loans](#loans).
 - **CSV import** for a bank export, a spreadsheet, or a timesheet, with column
   matching, a preview, and duplicate detection. See [Importing a CSV](#importing-a-csv).
 - **Export** of any date range as a single ZIP: the Schedule F summary, the
@@ -103,6 +106,24 @@ expenses mapping Amount to Debit, then income mapping Amount to Credit.
 
 There is a blank template to download on the page if you'd rather type it out.
 
+## Loans
+
+Record a mortgage or an operating loan under **Loans**, then log payments as
+your lender's statement reports them: interest, principal, and escrow entered
+separately, with the total shown as you type.
+
+Only the **interest** is deductible, and it lands on Schedule F line 21a for a
+mortgage on farm property or 21b for anything else - added to any interest you
+entered by hand, and labelled on the line so the two sources stay visible.
+Principal repays what you borrowed and is not an expense; escrow is money the
+lender holds for tax or insurance, which belongs on whichever line it is
+eventually spent against. The loan page tracks the balance down as principal is
+repaid.
+
+Nothing is amortised from the interest rate. The split that reaches your return
+is the one on the statement, because that is the figure a preparer reconciles
+to and the one that appears on a Form 1098.
+
 ## Exporting
 
 **Settings → Export**, or **Full export** from the report. Pick a date range and
@@ -115,8 +136,10 @@ schedule-f-2026.csv     every Schedule F line for that tax year
 transactions.csv        every entry, each carrying its Schedule F line
 assets.csv              the depreciable asset register
 depreciation-2026.csv   per-asset working for Form 4562
+loans.csv               loans, interest paid, and what is still owed
+loan-payments.csv       every payment split into interest/principal/escrow
 hours.csv               hours worked, in minutes and decimal hours
-receipts/               images, named txn-<id>-<n> to match transactions.csv
+receipts/               images: txn-<id>-<n> entries, asset-<id>-<n> assets
 archive.json            the same data losslessly, in cents
 ```
 
@@ -207,6 +230,8 @@ recorded — not a filable form, and not tax advice. Known simplifications:
   by hand, and the report labels the line when both are present. Section 179
   limits, bonus percentages, and recapture on sale are yours to verify - see
   [Depreciation](#depreciation).
+- Lines 21a and 21b combine interest from recorded loan payments with anything
+  entered by hand, and the report labels the line when both are present.
 - Line numbers follow the Schedule F layout but should be checked against the
   current year's form and instructions.
 
@@ -234,6 +259,7 @@ src/
     export.ts         builds the handover/archive package
     depreciation.ts   MACRS engine; verified against the IRS optional tables
     assets.ts         stored assets -> schedules -> the line 14 figure
+    loans.ts          loan balances and the interest behind lines 21a/21b
     report.ts         roll-up into Part I / Part II / line 34, and CSV
     money.ts          integer cents; no floats touch an amount
     duration.ts       parsing and formatting time worked
@@ -244,7 +270,8 @@ src/
   components/         UI, including the camera-capture receipt picker
   app/
     (auth)/           login, first-run owner setup
-    (app)/            dashboard, entries, hours, assets, import, report, settings
+    (app)/            dashboard, entries, hours, assets, loans, import,
+                      export, report, settings
     api/receipts/     authenticated receipt image serving
   proxy.ts            redirects signed-out visitors (convenience only)
 ```

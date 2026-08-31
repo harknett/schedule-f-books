@@ -50,6 +50,11 @@ export async function GET(request: Request) {
   const assets = store.listAssets();
   const receiptsByAsset = new Map(assets.map((a) => [a.id, store.listAssetReceipts(a.id)]));
 
+  // Loans, like assets, are not range-filtered: a mortgage predating the range
+  // still accrues interest inside it. Payments are.
+  const loans = store.listLoans();
+  const loanPayments = store.listAllLoanPayments(from, to);
+
   const timeEntries = store.listTimeEntriesInRange(
     from,
     to,
@@ -91,6 +96,8 @@ export async function GET(request: Request) {
     receiptsByTransaction,
     assets,
     receiptsByAsset,
+    loans,
+    loanPayments,
     timeEntries,
     receiptFiles,
     includeReceipts,

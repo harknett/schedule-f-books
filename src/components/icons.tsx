@@ -150,3 +150,13 @@ export function DownloadIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+export function BankIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 10 12 4l9 6" />
+      <path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8" />
+      <path d="M3 21h18" />
+    </Icon>
+  );
+}

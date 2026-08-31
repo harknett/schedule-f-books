@@ -4,6 +4,7 @@ import { ArrowDownIcon, ArrowUpIcon, ClockIcon } from "@/components/icons";
 import { TransactionList } from "@/components/transaction-row";
 import { ButtonLink, Card, EmptyState, PageHeader, Stat } from "@/components/ui";
 import { summarizeYear } from "@/lib/assets";
+import { interestForYear } from "@/lib/loans";
 import { requireUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
 import { currentYear } from "@/lib/dates";
@@ -25,8 +26,10 @@ export default async function DashboardPage() {
   const year = currentYear();
 
   const depreciation = summarizeYear(store.listAssets(), year);
+  const loanInterest = interestForYear(store.listLoans(), store.listAllLoanPayments(), year);
   const report = buildReport(year, store.categoryTotals(year), {
     assetDepreciation: depreciation.total,
+    loanInterest,
   });
   const recent = store.listTransactions({ limit: 6 });
   const minutes = store.totalMinutes(user.id, year);
@@ -110,7 +113,21 @@ export default async function DashboardPage() {
         </Card>
       ) : null}
 
-      {report.transactionCount > 0 || depreciation.total > 0 ? (
+      {loanInterest.total > 0 ? (
+        <Card className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-medium">Loan interest · lines 21a/21b</p>
+            <p className="text-sm text-muted">
+              {formatUsd(loanInterest.total)} paid this year.
+            </p>
+          </div>
+          <ButtonLink href="/loans" variant="secondary">
+            Loans
+          </ButtonLink>
+        </Card>
+      ) : null}
+
+      {report.transactionCount > 0 || depreciation.total > 0 || loanInterest.total > 0 ? (
         <Card className="flex items-center justify-between gap-3">
           <div>
             <p className="font-medium">Year-end report</p>

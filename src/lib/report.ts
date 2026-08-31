@@ -37,6 +37,8 @@ export interface ScheduleFReport {
   transactionCount: number;
   /** The part of line 14 that came from the asset schedule rather than an entry. */
   assetDepreciation: Cents;
+  /** The parts of lines 21a and 21b that came from recorded loan payments. */
+  loanInterest: { mortgage: Cents; other: Cents };
 }
 
 export interface ReportOptions {
@@ -46,10 +48,22 @@ export interface ReportOptions {
    * so the two sources stay visible rather than silently doubling up.
    */
   assetDepreciation?: Cents;
+  /**
+   * Interest from recorded loan payments, added to lines 21a and 21b on top of
+   * anything entered by hand and broken out on the line, for the same reason
+   * line 14 does it: the two sources must stay visible.
+   */
+  loanInterest?: { mortgage: Cents; other: Cents };
 }
 
 /** The Schedule F line that depreciation belongs on. */
 const DEPRECIATION_CATEGORY = "depreciation";
+
+/** Categories fed by the loan register, and the source of their extra amount. */
+const INTEREST_CATEGORIES = {
+  interest_mortgage: "mortgage",
+  interest_other: "other",
+} as const;
 
 /**
  * Roll per-category totals up into Schedule F's line structure.
@@ -66,6 +80,7 @@ export function buildReport(
 ): ScheduleFReport {
   const byCategory = new Map(totals.map((t) => [t.categoryId, t]));
   const assetDepreciation = options.assetDepreciation ?? 0;
+  const loanInterest = options.loanInterest ?? { mortgage: 0, other: 0 };
 
   const lineFor = (categoryId: string): ReportLine => {
     const category = requireCategory(categoryId);
@@ -110,18 +125,37 @@ export function buildReport(
 
   const expenses = EXPENSE_CATEGORIES.map((c) => {
     const row = lineFor(c.id);
-    if (c.id !== DEPRECIATION_CATEGORY || assetDepreciation === 0) return row;
+    const entered = row.amount;
 
     // Line 14 carries the asset schedule plus anything entered by hand.
-    const entered = row.amount;
-    return {
-      ...row,
-      amount: entered + assetDepreciation,
-      note:
-        entered === 0
-          ? "From the asset schedule"
-          : "Asset schedule plus entries recorded by hand",
-    };
+    if (c.id === DEPRECIATION_CATEGORY && assetDepreciation !== 0) {
+      return {
+        ...row,
+        amount: entered + assetDepreciation,
+        note:
+          entered === 0
+            ? "From the asset schedule"
+            : "Asset schedule plus entries recorded by hand",
+      };
+    }
+
+    // Lines 21a and 21b carry interest from the loan register the same way.
+    const interestSource = INTEREST_CATEGORIES[c.id as keyof typeof INTEREST_CATEGORIES];
+    if (interestSource) {
+      const fromLoans = loanInterest[interestSource];
+      if (fromLoans !== 0) {
+        return {
+          ...row,
+          amount: entered + fromLoans,
+          note:
+            entered === 0
+              ? "From recorded loan payments"
+              : "Loan payments plus entries recorded by hand",
+        };
+      }
+    }
+
+    return row;
   }).sort((a, b) => {
     const [an, as] = lineSortKey(a.line);
     const [bn, bs] = lineSortKey(b.line);
@@ -140,6 +174,7 @@ export function buildReport(
     netProfit: grossIncome - totalExpenses,
     transactionCount,
     assetDepreciation,
+    loanInterest,
   };
 }
 

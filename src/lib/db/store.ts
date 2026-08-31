@@ -7,7 +7,11 @@ import { MIGRATIONS } from "./migrations";
 import type {
   Asset,
   CategoryTotal,
+  Loan,
+  LoanPayment,
   NewAsset,
+  NewLoan,
+  NewLoanPayment,
   NewTimeEntry,
   NewTransaction,
   Receipt,
@@ -92,6 +96,36 @@ function mapAsset(r: Row): Asset {
     createdBy: nnum(r.created_by),
     createdAt: str(r.created_at),
     updatedAt: str(r.updated_at),
+  };
+}
+
+function mapLoan(r: Row): Loan {
+  return {
+    id: num(r.id),
+    name: str(r.name),
+    lender: nstr(r.lender),
+    kind: str(r.kind) as Loan["kind"],
+    principal: num(r.principal),
+    interestRate: nnum(r.interest_rate),
+    startDate: nstr(r.start_date),
+    notes: nstr(r.notes),
+    createdBy: nnum(r.created_by),
+    createdAt: str(r.created_at),
+    updatedAt: str(r.updated_at),
+  };
+}
+
+function mapLoanPayment(r: Row): LoanPayment {
+  return {
+    id: num(r.id),
+    loanId: num(r.loan_id),
+    date: str(r.date),
+    interest: num(r.interest),
+    principal: num(r.principal),
+    escrow: num(r.escrow),
+    notes: nstr(r.notes),
+    createdBy: nnum(r.created_by),
+    createdAt: str(r.created_at),
   };
 }
 
@@ -462,6 +496,111 @@ export class Store {
       .prepare(`SELECT COALESCE(SUM(minutes), 0) AS n FROM time_entries WHERE ${clauses.join(" AND ")}`)
       .get(...params) as Row;
     return num(row.n);
+  }
+
+  // --- loans ---------------------------------------------------------------
+
+  createLoan(input: NewLoan): Loan {
+    const info = this.db
+      .prepare(
+        `INSERT INTO loans (name, lender, kind, principal, interest_rate, start_date, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.name,
+        input.lender ?? null,
+        input.kind,
+        input.principal,
+        input.interestRate ?? null,
+        input.startDate ?? null,
+        input.notes ?? null,
+        input.createdBy ?? null,
+      );
+    return this.getLoan(Number(info.lastInsertRowid))!;
+  }
+
+  getLoan(id: number): Loan | undefined {
+    const row = this.db.prepare("SELECT * FROM loans WHERE id = ?").get(id) as Row | undefined;
+    return row ? mapLoan(row) : undefined;
+  }
+
+  updateLoan(id: number, patch: Omit<NewLoan, "createdBy">): Loan | undefined {
+    this.db
+      .prepare(
+        `UPDATE loans
+         SET name = ?, lender = ?, kind = ?, principal = ?, interest_rate = ?,
+             start_date = ?, notes = ?, updated_at = datetime('now')
+         WHERE id = ?`,
+      )
+      .run(
+        patch.name,
+        patch.lender ?? null,
+        patch.kind,
+        patch.principal,
+        patch.interestRate ?? null,
+        patch.startDate ?? null,
+        patch.notes ?? null,
+        id,
+      );
+    return this.getLoan(id);
+  }
+
+  /** Deletes the loan and cascades its payments. */
+  deleteLoan(id: number): void {
+    this.db.prepare("DELETE FROM loans WHERE id = ?").run(id);
+  }
+
+  listLoans(): Loan[] {
+    const rows = this.db
+      .prepare("SELECT * FROM loans ORDER BY name COLLATE NOCASE")
+      .all() as Row[];
+    return rows.map(mapLoan);
+  }
+
+  addLoanPayment(input: NewLoanPayment): LoanPayment {
+    const info = this.db
+      .prepare(
+        `INSERT INTO loan_payments (loan_id, date, interest, principal, escrow, notes, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        input.loanId,
+        input.date,
+        input.interest,
+        input.principal,
+        input.escrow ?? 0,
+        input.notes ?? null,
+        input.createdBy ?? null,
+      );
+    return this.getLoanPayment(Number(info.lastInsertRowid))!;
+  }
+
+  getLoanPayment(id: number): LoanPayment | undefined {
+    const row = this.db.prepare("SELECT * FROM loan_payments WHERE id = ?").get(id) as
+      | Row
+      | undefined;
+    return row ? mapLoanPayment(row) : undefined;
+  }
+
+  deleteLoanPayment(id: number): void {
+    this.db.prepare("DELETE FROM loan_payments WHERE id = ?").run(id);
+  }
+
+  listLoanPayments(loanId: number): LoanPayment[] {
+    const rows = this.db
+      .prepare("SELECT * FROM loan_payments WHERE loan_id = ? ORDER BY date DESC, id DESC")
+      .all(loanId) as Row[];
+    return rows.map(mapLoanPayment);
+  }
+
+  /** Every payment, optionally within a date range - used by the report and export. */
+  listAllLoanPayments(from?: string, to?: string): LoanPayment[] {
+    const sql =
+      from && to
+        ? "SELECT * FROM loan_payments WHERE date BETWEEN ? AND ? ORDER BY date, id"
+        : "SELECT * FROM loan_payments ORDER BY date, id";
+    const rows = this.db.prepare(sql).all(...(from && to ? [from, to] : [])) as Row[];
+    return rows.map(mapLoanPayment);
   }
 
   // --- bulk import ---------------------------------------------------------

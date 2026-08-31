@@ -125,3 +125,60 @@ export interface NewAsset {
   notes?: string | null;
   createdBy?: number | null;
 }
+
+/** Interest on a farm mortgage goes to Schedule F line 21a; anything else 21b. */
+export type LoanKind = "mortgage" | "other";
+
+export interface Loan {
+  id: number;
+  name: string;
+  lender: string | null;
+  kind: LoanKind;
+  /** Original amount borrowed, in cents. */
+  principal: Cents;
+  /** Annual rate as a percentage. Informational; nothing is amortised from it. */
+  interestRate: number | null;
+  startDate: string | null;
+  notes: string | null;
+  createdBy: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NewLoan {
+  name: string;
+  lender?: string | null;
+  kind: LoanKind;
+  principal: Cents;
+  interestRate?: number | null;
+  startDate?: string | null;
+  notes?: string | null;
+  createdBy?: number | null;
+}
+
+/**
+ * One payment, stored as its parts. The total is always the sum of the three,
+ * so there is no separate figure to fall out of step.
+ */
+export interface LoanPayment {
+  id: number;
+  loanId: number;
+  date: string;
+  interest: Cents;
+  principal: Cents;
+  /** Taxes, insurance, or anything else bundled in that is not interest. */
+  escrow: Cents;
+  notes: string | null;
+  createdBy: number | null;
+  createdAt: string;
+}
+
+export interface NewLoanPayment {
+  loanId: number;
+  date: string;
+  interest: Cents;
+  principal: Cents;
+  escrow?: Cents;
+  notes?: string | null;
+  createdBy?: number | null;
+}

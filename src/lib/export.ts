@@ -16,11 +16,12 @@
 
 import { assetClassLabel, deductionFor, scheduleFor } from "./assets";
 import { toCsv, type CsvRow } from "./csv";
-import type { Asset, Receipt, TimeEntry, TransactionWithMeta } from "./db/types";
+import type { Asset, Loan, LoanPayment, Receipt, TimeEntry, TransactionWithMeta } from "./db/types";
 import { prettyDate } from "./dates";
 import { CONVENTION_LABELS, METHOD_LABELS } from "./depreciation";
 import { formatHours } from "./duration";
 import type { Cents } from "./money";
+import { LOAN_KIND_LABELS, LOAN_KIND_LINES, interestForYear, paymentTotal, summarizeLoan } from "./loans";
 import { buildReport, reportToCsv } from "./report";
 import { getCategory } from "./schedule-f";
 import type { ZipEntry } from "./zip";
@@ -44,6 +45,9 @@ export interface ExportInput {
   assets: Asset[];
   /** Bills of sale and invoices filed against an asset. */
   receiptsByAsset: Map<number, Receipt[]>;
+  loans: Loan[];
+  /** Every recorded payment; interest from these reaches lines 21a and 21b. */
+  loanPayments: LoanPayment[];
   timeEntries: ExportTimeEntry[];
   /** Already-loaded receipt files, named as they appear in the archive. */
   receiptFiles: ZipEntry[];
@@ -234,6 +238,88 @@ export function depreciationCsv(assets: Asset[], year: number): string {
   return toCsv(rows);
 }
 
+/** The loan register, with what has been paid and what is still owed. */
+export function loansCsv(loans: Loan[], payments: LoanPayment[], year: number): string {
+  const rows: CsvRow[] = [
+    [
+      "id",
+      "name",
+      "lender",
+      "kind",
+      "schedule_f_line",
+      "borrowed",
+      "interest_rate",
+      "start_date",
+      "principal_repaid",
+      "interest_paid_all_time",
+      `interest_paid_${year}`,
+      "escrow_paid",
+      "balance",
+      "notes",
+    ],
+  ];
+
+  for (const loan of loans) {
+    const mine = payments.filter((p) => p.loanId === loan.id);
+    const { paid, balance, interestInYear } = summarizeLoan(loan, mine, year);
+    rows.push([
+      String(loan.id),
+      loan.name,
+      loan.lender ?? "",
+      LOAN_KIND_LABELS[loan.kind],
+      LOAN_KIND_LINES[loan.kind],
+      dollars(loan.principal),
+      loan.interestRate != null ? String(loan.interestRate) : "",
+      loan.startDate ?? "",
+      dollars(paid.principal),
+      dollars(paid.interest),
+      dollars(interestInYear),
+      dollars(paid.escrow),
+      dollars(balance),
+      loan.notes ?? "",
+    ]);
+  }
+  return toCsv(rows);
+}
+
+/** Every payment, so a preparer can see the interest they are being asked to deduct. */
+export function loanPaymentsCsv(loans: Loan[], payments: LoanPayment[]): string {
+  const nameOf = new Map(loans.map((l) => [l.id, l.name]));
+  const lineOf = new Map(loans.map((l) => [l.id, LOAN_KIND_LINES[l.kind]]));
+
+  const rows: CsvRow[] = [
+    ["id", "date", "loan", "schedule_f_line", "interest", "principal", "escrow", "total", "notes"],
+  ];
+
+  let interest = 0;
+  let principal = 0;
+  let escrow = 0;
+
+  for (const payment of payments) {
+    interest += payment.interest;
+    principal += payment.principal;
+    escrow += payment.escrow;
+    rows.push([
+      String(payment.id),
+      payment.date,
+      nameOf.get(payment.loanId) ?? "",
+      lineOf.get(payment.loanId) ?? "",
+      dollars(payment.interest),
+      dollars(payment.principal),
+      dollars(payment.escrow),
+      dollars(paymentTotal(payment)),
+      payment.notes ?? "",
+    ]);
+  }
+
+  rows.push([
+    "", "TOTAL", "", "",
+    dollars(interest), dollars(principal), dollars(escrow),
+    dollars(interest + principal + escrow), "",
+  ]);
+  return toCsv(rows);
+}
+
 export function hoursCsv(entries: ExportTimeEntry[]): string {
   const rows: CsvRow[] = [["date", "person", "task", "minutes", "hours", "notes"]];
   let totalMinutes = 0;
@@ -319,6 +405,34 @@ export function archiveJson(input: ExportInput): string {
             })),
           };
         }),
+        loans: input.loans.map((loan) => {
+          const mine = input.loanPayments.filter((p) => p.loanId === loan.id);
+          const { paid, balance } = summarizeLoan(loan, mine, Number(input.to.slice(0, 4)));
+          return {
+            id: loan.id,
+            name: loan.name,
+            lender: loan.lender,
+            kind: loan.kind,
+            scheduleFLine: LOAN_KIND_LINES[loan.kind],
+            borrowedCents: loan.principal,
+            interestRate: loan.interestRate,
+            startDate: loan.startDate,
+            notes: loan.notes,
+            principalRepaidCents: paid.principal,
+            interestPaidCents: paid.interest,
+            escrowPaidCents: paid.escrow,
+            balanceCents: balance,
+            payments: mine.map((p) => ({
+              id: p.id,
+              date: p.date,
+              interestCents: p.interest,
+              principalCents: p.principal,
+              escrowCents: p.escrow,
+              totalCents: paymentTotal(p),
+              notes: p.notes,
+            })),
+          };
+        }),
         timeEntries: input.timeEntries.map((entry) => ({
           id: entry.id,
           date: entry.date,
@@ -343,6 +457,9 @@ export function readmeText(input: ExportInput, years: number[]): string {
     .reduce((sum, t) => sum + t.amount, 0);
   const minutes = input.timeEntries.reduce((sum, e) => sum + e.minutes, 0);
   const receiptCount = input.receiptFiles.length;
+  const loanInterest = input.loanPayments
+    .filter((p) => p.date >= input.from && p.date <= input.to)
+    .reduce((sum, p) => sum + p.interest, 0);
 
   // Built as pairs and padded to the widest name, so the columns line up
   // whatever the years in the range make the filenames.
@@ -364,6 +481,13 @@ export function readmeText(input: ExportInput, years: number[]): string {
         `Per-asset depreciation for ${year}; the working for Form 4562.`,
       ]);
     }
+  }
+  if (input.loans.length > 0) {
+    contents.push(["loans.csv", "Loans, with interest paid and what is still owed."]);
+    contents.push([
+      "loan-payments.csv",
+      "Every payment, split into interest, principal, and escrow.",
+    ]);
   }
   if (input.timeEntries.length > 0) {
     contents.push(["hours.csv", "Hours worked on the farm."]);
@@ -404,6 +528,8 @@ export function readmeText(input: ExportInput, years: number[]): string {
     `  Income               $${dollars(income)}`,
     `  Expenses             $${dollars(expenses)}   (before depreciation)`,
     `  Assets on register   ${input.assets.length}`,
+    `  Loans on register    ${input.loans.length}`,
+    `  Interest paid        $${dollars(loanInterest)}   (lines 21a and 21b)`,
     `  Hours logged         ${formatHours(minutes)}`,
     `  Receipt images       ${input.includeReceipts ? receiptCount : "not included"}`,
     "",
@@ -415,6 +541,9 @@ export function readmeText(input: ExportInput, years: number[]): string {
     "  * Line 14 in the summary combines the depreciation schedule with any",
     "    depreciation entered by hand. depreciation-<year>.csv shows the",
     "    asset-by-asset working.",
+    "  * Lines 21a and 21b combine interest from recorded loan payments with",
+    "    any interest entered by hand. Only interest is deductible: principal",
+    "    and escrow in loan-payments.csv are shown for reconciliation only.",
     "  * Taxable-amount lines (3b, 4b, 5c, 6b) are shown equal to the gross",
     "    amounts recorded. Elections and deferrals are not modelled, and",
     "    line 32 is a single bucket rather than 32a-32f.",
@@ -457,7 +586,10 @@ export function buildExportEntries(input: ExportInput): ZipEntry[] {
     const report = buildReport(
       year,
       [...totals].map(([categoryId, v]) => ({ categoryId, ...v })),
-      { assetDepreciation },
+      {
+        assetDepreciation,
+        loanInterest: interestForYear(input.loans, input.loanPayments, year),
+      },
     );
     add(`schedule-f-${year}.csv`, reportToCsv(report));
 
@@ -467,6 +599,11 @@ export function buildExportEntries(input: ExportInput): ZipEntry[] {
   }
 
   add("transactions.csv", transactionsCsv(input));
+  if (input.loans.length > 0) {
+    const yearForBalances = Number(input.to.slice(0, 4));
+    add("loans.csv", loansCsv(input.loans, input.loanPayments, yearForBalances));
+    add("loan-payments.csv", loanPaymentsCsv(input.loans, input.loanPayments));
+  }
   if (input.assets.length > 0) {
     add("assets.csv", assetsCsv(input.assets, input.receiptsByAsset, input.includeReceipts));
   }

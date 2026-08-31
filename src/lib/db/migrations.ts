@@ -119,4 +119,42 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX idx_receipts_transaction ON receipts(transaction_id);
   CREATE INDEX idx_receipts_asset ON receipts(asset_id);
   `,
+
+  // Farm loans and their payments.
+  //
+  // A payment is stored as its parts rather than as a total plus a split: the
+  // total is always interest + principal + escrow, so it cannot drift out of
+  // agreement with itself. Only the interest is deductible, and it lands on
+  // Schedule F line 21a or 21b according to the loan's kind.
+  `
+  CREATE TABLE loans (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL,
+    lender        TEXT,
+    kind          TEXT NOT NULL CHECK (kind IN ('mortgage','other')),
+    principal     INTEGER NOT NULL CHECK (principal >= 0),
+    interest_rate REAL,
+    start_date    TEXT,
+    notes         TEXT,
+    created_by    INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE loan_payments (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    loan_id    INTEGER NOT NULL REFERENCES loans(id) ON DELETE CASCADE,
+    date       TEXT NOT NULL,
+    interest   INTEGER NOT NULL DEFAULT 0 CHECK (interest >= 0),
+    principal  INTEGER NOT NULL DEFAULT 0 CHECK (principal >= 0),
+    escrow     INTEGER NOT NULL DEFAULT 0 CHECK (escrow >= 0),
+    notes      TEXT,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    -- A payment of nothing at all is a mistake, not a record.
+    CHECK (interest + principal + escrow > 0)
+  );
+  CREATE INDEX idx_loan_payments_loan ON loan_payments(loan_id);
+  CREATE INDEX idx_loan_payments_date ON loan_payments(date);
+  `,
 ];

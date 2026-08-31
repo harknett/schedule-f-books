@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { summarizeYear } from "@/lib/assets";
+import { interestForYear } from "@/lib/loans";
 import { currentUser } from "@/lib/auth/session";
 import { getStore } from "@/lib/db";
 import { buildReport, reportToCsv } from "@/lib/report";
@@ -23,6 +24,7 @@ export async function GET(
   const report = buildReport(year, store.categoryTotals(year), {
     // Keep the CSV in step with the on-screen report, line 14 included.
     assetDepreciation: summarizeYear(store.listAssets(), year).total,
+    loanInterest: interestForYear(store.listLoans(), store.listAllLoanPayments(), year),
   });
 
   return new NextResponse(reportToCsv(report), {

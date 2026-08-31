@@ -4,7 +4,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType, SVGProps } from "react";
 
-import { BookIcon, ClockIcon, HomeIcon, PlusIcon, ReportIcon, TractorIcon } from "./icons";
+import {
+  BankIcon,
+  BookIcon,
+  ClockIcon,
+  HomeIcon,
+  PlusIcon,
+  ReportIcon,
+  TractorIcon,
+} from "./icons";
 
 interface NavItem {
   href: string;
@@ -18,15 +26,18 @@ const ITEMS: NavItem[] = [
   { href: "/transactions", label: "Books", Icon: BookIcon },
   { href: "/time", label: "Time", Icon: ClockIcon },
   { href: "/assets", label: "Assets", Icon: TractorIcon },
+  { href: "/loans", label: "Loans", Icon: BankIcon },
   { href: "/report", label: "Schedule F", Icon: ReportIcon },
 ];
 
 /**
  * The phone bar carries the four things done repeatedly in the field, either
- * side of the add button. Assets is a few-times-a-year job, so it lives on the
- * dashboard and in the add sheet rather than taking a thumb position here.
+ * side of the add button. Assets and Loans are a few-times-a-year job, so they
+ * live on the dashboard and in the add sheet rather than taking a thumb
+ * position here.
  */
-const BOTTOM_BAR: NavItem[] = ITEMS.filter((item) => item.href !== "/assets");
+const OCCASIONAL = new Set(["/assets", "/loans"]);
+const BOTTOM_BAR: NavItem[] = ITEMS.filter((item) => !OCCASIONAL.has(item.href));
 
 function isActive(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname.startsWith(href);
