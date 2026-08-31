@@ -20,7 +20,8 @@ afterthought.
   HEIC, JPEG, PNG, WebP, and supplier PDFs are all accepted, stored alongside
   the entry, and served only to signed-in users.
 - **Hours worked**, entered the way people actually type them (`2.5`, `2h 30m`,
-  `2:30`, `90m`), with a breakdown of where the time went.
+  `2:30`, `90m`), with a breakdown of where the time went — and a **catch-up**
+  mode for logging the same task across a run of days at once.
 - **Asset depreciation** under MACRS, with a full year-by-year schedule that
   feeds Schedule F line 14 automatically. See
   [Depreciation](#depreciation). Assets take paperwork of their own - a bill of
@@ -71,6 +72,20 @@ same network use the machine's LAN address, or put it behind a reverse proxy
 with HTTPS for access from anywhere. Use HTTPS for anything beyond your own
 network: session cookies are marked `secure` in production and will not be sent
 over plain HTTP.
+
+## Catching up on hours
+
+Nobody logs every day as it happens. **Hours → Catching up** takes one task,
+one duration, and a run of days, and writes an entry for each.
+
+Pick the first and last day, and leave the weekday buttons on for every day or
+switch some off — Saturdays only for market, weekdays only for chores. The
+count updates as you go, so you see *15 entries* before you commit to them.
+
+Days that already carry the identical entry are left alone, so running the same
+catch-up twice does not double your hours; it says how many it skipped. A
+different duration or a different task on the same day is a real second record,
+not a duplicate, and is written.
 
 ## Importing a CSV
 
@@ -309,6 +324,7 @@ src/
     report.ts         roll-up into Part I / Part II / line 34, and CSV
     money.ts          integer cents; no floats touch an amount
     duration.ts       parsing and formatting time worked
+    dates.ts          ISO date helpers, and expanding a range into weekdays
     db/               SQLite store, migrations, row mapping
     auth/             scrypt hashing, session cookies, and the two gates:
                       requireUser (signed in, password is their own) and
