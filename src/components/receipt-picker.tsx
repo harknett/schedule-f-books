@@ -1,9 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { CameraIcon, ReceiptIcon, TrashIcon } from "./icons";
 import { ACCEPTED_RECEIPT_TYPES, MAX_RECEIPT_BYTES, MAX_RECEIPT_MB } from "@/lib/receipt-limits";
+
+/**
+ * Out of sight but still in the render tree.
+ *
+ * Not `display: none`: Safari will not open a file picker for an input that
+ * has been taken out of the layout, and it leaves the input unfocusable, which
+ * would strand keyboard users on the label.
+ */
+const VISUALLY_HIDDEN =
+  "absolute h-px w-px overflow-hidden opacity-0 [clip:rect(0,0,0,0)]";
 
 interface Preview {
   file: File;
@@ -20,14 +30,24 @@ interface Preview {
  *
  * Both feed one hidden `receipts` input, kept in sync via DataTransfer, so the
  * server action sees a single list no matter how the files arrived.
+ *
+ * The two controls are <label>s rather than buttons calling input.click().
+ * Tapping a label activates its input natively, with real user activation, in
+ * every browser - whereas a scripted click on a `display: none` input is
+ * ignored by Safari and iOS Safari, which is the one place this feature has to
+ * work. The inputs are therefore moved out of sight rather than out of the
+ * render tree.
  */
 export function ReceiptPicker() {
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const cameraRef = useRef<HTMLInputElement>(null);
-  const libraryRef = useRef<HTMLInputElement>(null);
   const payloadRef = useRef<HTMLInputElement>(null);
+
+  // Ids that stay unique when two pickers share a page.
+  const fieldId = useId();
+  const cameraId = `${fieldId}-camera`;
+  const libraryId = `${fieldId}-library`;
 
   // Mirror state into the real form control the server action reads.
   useEffect(() => {
@@ -76,31 +96,29 @@ export function ReceiptPicker() {
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => cameraRef.current?.click()}
-          className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-accent bg-accent-soft text-accent min-h-12 px-3 font-medium"
+        <label
+          htmlFor={cameraId}
+          className="flex-1 inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-accent bg-accent-soft text-accent min-h-12 px-3 font-medium focus-within:ring-2 focus-within:ring-accent/40"
         >
           <CameraIcon className="h-5 w-5" />
           Take photo
-        </button>
-        <button
-          type="button"
-          onClick={() => libraryRef.current?.click()}
-          className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface min-h-12 px-4"
+        </label>
+        <label
+          htmlFor={libraryId}
+          className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-line bg-surface min-h-12 px-4 focus-within:ring-2 focus-within:ring-accent/40"
         >
           <ReceiptIcon className="h-5 w-5" />
           <span className="sr-only sm:not-sr-only">Upload</span>
-        </button>
+        </label>
       </div>
 
       {/* Rear camera, one shot at a time. */}
       <input
-        ref={cameraRef}
+        id={cameraId}
         type="file"
         accept="image/*"
         capture="environment"
-        className="hidden"
+        className={VISUALLY_HIDDEN}
         onChange={(e) => {
           add(e.target.files);
           e.target.value = "";
@@ -108,17 +126,18 @@ export function ReceiptPicker() {
       />
       {/* Library or file manager, several at once. */}
       <input
-        ref={libraryRef}
+        id={libraryId}
         type="file"
         accept={ACCEPTED_RECEIPT_TYPES}
         multiple
-        className="hidden"
+        className={VISUALLY_HIDDEN}
         onChange={(e) => {
           add(e.target.files);
           e.target.value = "";
         }}
       />
-      <input ref={payloadRef} type="file" name="receipts" multiple className="hidden" />
+      {/* Never clicked, only read: this is what the server action submits. */}
+      <input ref={payloadRef} type="file" name="receipts" multiple className={VISUALLY_HIDDEN} />
 
       {error ? <p className="text-xs text-danger">{error}</p> : null}
 
