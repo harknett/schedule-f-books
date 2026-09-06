@@ -1,0 +1,84 @@
+# Schedule F Books, as a system service.
+#
+# Install:
+#   sudo cp deploy/schedule-f-books.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now schedule-f-books
+#
+# See deploy/README.md for the user, directories, and reverse proxy this
+# expects. Nothing here is created automatically.
+
+[Unit]
+Description=Schedule F Books - farm income, expenses, receipts and hours
+Documentation=https://github.com/harknett/schedule-f-books
+# Wants, not Requires: the network being briefly absent is not a reason to
+# refuse to start, and the socket binds loopback anyway.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=schedule-f-books
+Group=schedule-f-books
+
+# The built application. Read-only to the service; see ProtectSystem below.
+WorkingDirectory=/opt/schedule-f-books
+
+# systemd creates and owns this, so the unit is enough to provision the state
+# directory on a fresh machine: /var/lib/schedule-f-books.
+StateDirectory=schedule-f-books
+StateDirectoryMode=0700
+Environment=DATA_DIR=/var/lib/schedule-f-books
+
+Environment=NODE_ENV=production
+# Loopback only. The service is expected to sit behind a reverse proxy that
+# terminates TLS; binding publicly would expose it over plain HTTP, and the
+# session cookie is Secure in production so it would not work anyway.
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=3000
+
+# The standalone server, which needs no node_modules and honours HOSTNAME.
+# `next start` ignores HOSTNAME and would bind every interface.
+ExecStart=/usr/bin/node /opt/schedule-f-books/.next/standalone/server.js
+
+# The app closes SQLite on SIGTERM, checkpointing the WAL so a backup taken
+# while stopped is one complete file.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+Restart=on-failure
+RestartSec=5s
+
+# --- confinement ---------------------------------------------------------
+# The application directory is read-only and the state directory is the only
+# thing it can write, which is what the code already assumes: nothing is
+# written outside DATA_DIR.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+# Node needs AF_INET to listen; AF_UNIX for the usual internals.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Journald picks up stdout and stderr.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=schedule-f-books
+
+[Install]
+WantedBy=multi-user.target

@@ -3,7 +3,14 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { CameraIcon, ReceiptIcon, TrashIcon } from "./icons";
-import { ACCEPTED_RECEIPT_TYPES, MAX_RECEIPT_BYTES, MAX_RECEIPT_MB } from "@/lib/receipt-limits";
+import { downscaleImage } from "@/lib/downscale";
+import {
+  ACCEPTED_RECEIPT_TYPES,
+  MAX_RECEIPT_BYTES,
+  MAX_RECEIPT_MB,
+  MAX_UPLOAD_TOTAL_BYTES,
+  MAX_UPLOAD_TOTAL_MB,
+} from "@/lib/receipt-limits";
 
 /**
  * Out of sight but still in the render tree.
@@ -41,8 +48,12 @@ interface Preview {
 export function ReceiptPicker() {
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [error, setError] = useState<string | null>(null);
+  /** Set while photos are being resized, which is slow enough to notice. */
+  const [busy, setBusy] = useState(false);
 
   const payloadRef = useRef<HTMLInputElement>(null);
+  /** Mirrors `previews` for code that has awaited and may hold a stale copy. */
+  const previewsRef = useRef<Preview[]>([]);
 
   // Ids that stay unique when two pickers share a page.
   const fieldId = useId();
@@ -51,6 +62,7 @@ export function ReceiptPicker() {
 
   // Mirror state into the real form control the server action reads.
   useEffect(() => {
+    previewsRef.current = previews;
     if (!payloadRef.current) return;
     const transfer = new DataTransfer();
     for (const { file } of previews) transfer.items.add(file);
@@ -65,24 +77,53 @@ export function ReceiptPicker() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function add(list: FileList | null) {
+  async function add(list: FileList | null) {
     if (!list || list.length === 0) return;
     const accepted: Preview[] = [];
     let rejected: string | null = null;
 
-    for (const file of Array.from(list)) {
-      if (file.size > MAX_RECEIPT_BYTES) {
-        rejected = `${file.name} is over ${MAX_RECEIPT_MB} MB.`;
-        continue;
-      }
-      accepted.push({
-        file,
-        url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
-      });
-    }
+    setBusy(true);
+    try {
+      for (const original of Array.from(list)) {
+        // Shrink first: a 4 MB camera photo becomes a few hundred KB, so the
+        // checks below measure what will actually be uploaded.
+        const file = await downscaleImage(original);
 
-    setError(rejected);
-    if (accepted.length > 0) setPreviews((current) => [...current, ...accepted]);
+        if (file.size > MAX_RECEIPT_BYTES) {
+          rejected = `${original.name} is over ${MAX_RECEIPT_MB} MB.`;
+          continue;
+        }
+        accepted.push({
+          file,
+          url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+        });
+      }
+
+      if (accepted.length === 0) {
+        setError(rejected);
+        return;
+      }
+
+      // Every receipt on this entry travels in one request, so the total is
+      // what the server will be asked to accept. previewsRef rather than the
+      // previews state: this function has awaited, so the closed-over value
+      // may be a render behind.
+      const already = previewsRef.current.reduce((sum, p) => sum + p.file.size, 0);
+      const incoming = accepted.reduce((sum, p) => sum + p.file.size, 0);
+
+      if (already + incoming > MAX_UPLOAD_TOTAL_BYTES) {
+        for (const { url } of accepted) if (url) URL.revokeObjectURL(url);
+        setError(
+          `That would put this entry over ${MAX_UPLOAD_TOTAL_MB} MB of receipts. Save it and put the rest on another entry.`,
+        );
+        return;
+      }
+
+      setError(rejected);
+      setPreviews((current) => [...current, ...accepted]);
+    } finally {
+      setBusy(false);
+    }
   }
 
   function remove(index: number) {
@@ -139,6 +180,7 @@ export function ReceiptPicker() {
       {/* Never clicked, only read: this is what the server action submits. */}
       <input ref={payloadRef} type="file" name="receipts" multiple className={VISUALLY_HIDDEN} />
 
+      {busy ? <p className="text-xs text-muted">Preparing photo…</p> : null}
       {error ? <p className="text-xs text-danger">{error}</p> : null}
 
       {previews.length > 0 ? (
@@ -172,7 +214,8 @@ export function ReceiptPicker() {
         </ul>
       ) : (
         <p className="text-xs text-muted">
-          Snap the receipt now — it is filed with the entry and kept for your records.
+          Snap the receipt now — it is filed with the entry and kept for your records. Photos are
+          resized before upload, so this works on a slow connection.
         </p>
       )}
     </div>

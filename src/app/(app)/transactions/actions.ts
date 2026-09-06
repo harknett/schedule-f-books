@@ -8,6 +8,7 @@ import { getStore } from "@/lib/db";
 import { requireIsoDate } from "@/lib/dates";
 import { parseAmount } from "@/lib/money";
 import { deleteReceiptFile, saveReceiptFile } from "@/lib/receipts";
+import { MAX_UPLOAD_TOTAL_BYTES, MAX_UPLOAD_TOTAL_MB } from "@/lib/receipt-limits";
 import { requireCategory, type CategoryKind } from "@/lib/schedule-f";
 
 export interface TransactionFormState {
@@ -47,6 +48,15 @@ function readCommonFields(formData: FormData) {
 /** Attach every non-empty file under `receipts` to a transaction. */
 async function attachReceipts(formData: FormData, transactionId: number): Promise<void> {
   const files = formData.getAll("receipts").filter((f): f is File => f instanceof File && f.size > 0);
+
+  // The picker checks this too, but a client-side check is a courtesy, not a
+  // control. Re-checked here so the limit holds for anything that posts the
+  // action directly.
+  const total = files.reduce((sum, file) => sum + file.size, 0);
+  if (total > MAX_UPLOAD_TOTAL_BYTES) {
+    throw new Error(`Receipts on one entry must come to under ${MAX_UPLOAD_TOTAL_MB} MB.`);
+  }
+
   const store = getStore();
   for (const file of files) {
     const saved = await saveReceiptFile(file);

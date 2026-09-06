@@ -15,6 +15,9 @@ export function proxy(request: NextRequest) {
 
   const { pathname, search } = request.nextUrl;
   if (pathname === "/login" || pathname === "/register") return NextResponse.next();
+  // The health probe has no cookie and never will; redirecting it to /login
+  // would answer 307 and read as healthy to anything following redirects.
+  if (pathname === "/api/health") return NextResponse.next();
 
   const url = request.nextUrl.clone();
   url.pathname = "/login";

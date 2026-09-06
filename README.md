@@ -277,6 +277,34 @@ DATA_DIR=/mnt/backup/farm-books npm start
 
 `data/` is gitignored. Never commit it.
 
+## Running it on a server
+
+For a household machine or a small VPS, it runs as a systemd service under its
+own unprivileged user, with everything it writes confined to one state
+directory:
+
+```bash
+sudo cp deploy/schedule-f-books.service /etc/systemd/system/
+sudo systemctl enable --now schedule-f-books
+```
+
+**[deploy/README.md](deploy/README.md)** has the whole procedure — the service
+user, the build, the reverse proxy, backups and upgrades. Three things there
+are worth knowing before you start, because each one fails in a way that does
+not look like its cause:
+
+- **TLS is required.** The session cookie is `Secure` in production, so over
+  plain HTTP the browser accepts the sign-in and then drops the cookie. You
+  land back on the login page with nothing to explain it. (`localhost` is
+  exempt — browsers treat it as a secure context — so this only bites once it
+  is on a real hostname.)
+- **Raise the proxy's upload limit.** nginx caps request bodies at 1 MB by
+  default, which is smaller than any phone photo. Receipts then fail at the
+  proxy, before the app sees them.
+- **Pass `Host` through the proxy.** Next validates the origin of every Server
+  Action against it. Get it wrong and pages load perfectly while every save
+  fails.
+
 ## Accuracy and limits
 
 The report follows Schedule F's structure, but it is a summary of what you
