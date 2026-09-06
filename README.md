@@ -122,6 +122,36 @@ expenses mapping Amount to Debit, then income mapping Amount to Credit.
 
 There is a blank template to download on the page if you'd rather type it out.
 
+## Sorting expenses onto the right line
+
+A CSV from a bank or card names a payee and an amount. It never names a
+Schedule F line, because no bank knows what line 16 is. So imported expenses
+land on line 32, "other expenses" — the catch-all — and a return whose expenses
+are entirely "other" gives a preparer nothing to work with.
+
+**Books → Sort N on line 32**, or the prompt on the Schedule F report, opens a
+queue of everything sitting there. Each entry carries a suggested line worked
+out from words in the payee and description, and says which word triggered it:
+
+> **Bought chicken feed** · $22.94
+> *Suggested* — matched "chicken feed" → **16 · Feed**
+
+Accepting and overriding are the same gesture: the suggestion is pre-selected
+in an ordinary dropdown, so changing it is just changing it. **Accept the N
+confident ones** clears the unambiguous entries in a single press.
+
+Two deliberate limits:
+
+- **Only confident suggestions are swept up in bulk.** Entries matched on a
+  word that fits but could belong elsewhere — "supplies", "lumber", "fencing" —
+  are marked *worth a look* and left for you. A return that looks itemised and
+  is quietly wrong is worse than an honest pile on line 32.
+- **Some things are never guessed.** Purchased livestock has its own treatment,
+  and a word like "gas" is natural gas as often as gasoline. Where the rules
+  cannot be honest they say nothing rather than guess.
+
+Anything genuinely miscellaneous can stay on line 32. That is what it is for.
+
 ## Loans
 
 Record a mortgage or an operating loan under **Loans**, then log payments as

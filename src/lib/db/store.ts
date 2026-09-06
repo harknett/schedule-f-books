@@ -318,6 +318,22 @@ export class Store {
     return this.getTransaction(id);
   }
 
+  /**
+   * Move one entry to a different Schedule F line, touching nothing else.
+   *
+   * Narrower than updateTransaction on purpose: the review screen only ever
+   * changes the category, and round-tripping every other field through a form
+   * to do that is how amounts and dates get quietly rewritten.
+   */
+  setTransactionCategory(id: number, categoryId: string): boolean {
+    const info = this.db
+      .prepare(
+        "UPDATE transactions SET category_id = ?, updated_at = datetime('now') WHERE id = ?",
+      )
+      .run(categoryId, id);
+    return Number(info.changes) > 0;
+  }
+
   /** Deletes the row and cascades receipts. Returns the receipt filenames to unlink. */
   deleteTransaction(id: number): string[] {
     const files = this.listReceipts(id).map((r) => r.filename);

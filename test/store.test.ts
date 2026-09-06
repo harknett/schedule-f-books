@@ -125,6 +125,34 @@ describe("transactions", () => {
     expect(updated?.categoryId).toBe("fuel");
     expect(updated?.amount).toBe(250);
   });
+
+  it("moves an entry to another line without touching anything else", () => {
+    // What the review screen does. Everything but the category has to survive,
+    // because the whole point is re-filing an entry, not re-entering it.
+    const created = store.createTransaction({
+      kind: "expense",
+      categoryId: "other_expense",
+      date: "2026-03-14",
+      amount: 4_599,
+      payee: "Bought chick feed",
+      description: "Chick Feed",
+      paymentMethod: "card",
+    });
+
+    expect(store.setTransactionCategory(created.id, "feed")).toBe(true);
+
+    const moved = store.getTransaction(created.id);
+    expect(moved?.categoryId).toBe("feed");
+    expect(moved?.amount).toBe(4_599);
+    expect(moved?.date).toBe("2026-03-14");
+    expect(moved?.payee).toBe("Bought chick feed");
+    expect(moved?.description).toBe("Chick Feed");
+    expect(moved?.paymentMethod).toBe("card");
+  });
+
+  it("reports when there was no such entry to move", () => {
+    expect(store.setTransactionCategory(99_999, "feed")).toBe(false);
+  });
 });
 
 describe("category totals feed the report", () => {
