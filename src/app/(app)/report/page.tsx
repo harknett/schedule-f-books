@@ -41,6 +41,20 @@ export default async function ReportPage({
   const incomeRows = visible(report.income);
   const expenseRows = visible(report.expenses);
 
+  // Expenses still sitting on the catch-all line. Worth saying out loud here
+  // rather than only on the review screen: this is the page where a return
+  // that is entirely "other expenses" actually looks like one.
+  const uncategorised = store.countTransactions({
+    kind: "expense",
+    categoryId: "other_expense",
+    year,
+  });
+  const otherExpenseLine = report.expenses.find((l) => l.line === "32");
+  const otherShare =
+    report.totalExpenses > 0 && otherExpenseLine
+      ? otherExpenseLine.amount / report.totalExpenses
+      : 0;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -96,6 +110,28 @@ export default async function ReportPage({
         ))}
         <TotalRow line="9" label="Gross income" amount={report.grossIncome} />
       </Section>
+
+      {uncategorised > 0 ? (
+        <div className="card border-warn/40 bg-warn-soft p-4 text-sm">
+          <p className="font-semibold text-warn">
+            {uncategorised} {uncategorised === 1 ? "expense is" : "expenses are"} on line 32
+            {otherShare >= 0.5
+              ? ` — ${Math.round(otherShare * 100)}% of everything you spent`
+              : ""}
+          </p>
+          <p className="mt-1 text-muted">
+            Line 32 is the catch-all. Anything imported from a bank or card file lands there,
+            because those files never name a Schedule F line. Sorting them is what makes this
+            report useful to a preparer.
+          </p>
+          <Link
+            href={`/review${year ? `?year=${year}` : ""}`}
+            className="mt-2 inline-flex min-h-11 items-center text-accent underline"
+          >
+            Sort them now
+          </Link>
+        </div>
+      ) : null}
 
       <Section title="Part II · Farm expenses">
         {expenseRows.map((line) => (

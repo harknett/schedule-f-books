@@ -44,6 +44,12 @@ export default async function TransactionsPage({
   });
 
   const totals = store.categoryTotals(year);
+  // Expenses still on the catch-all line, so the way to fix them is one tap
+  // from the list where they are visible rather than only from the report.
+  const uncategorised = store.countTransactions({
+    kind: "expense",
+    categoryId: "other_expense",
+  });
   const byKind = (want: CategoryKind) =>
     store
       .listTransactions({ year, kind: want })
@@ -111,9 +117,16 @@ export default async function TransactionsPage({
           </div>
         ) : null}
 
-        <Link href="/import" className="ml-auto text-sm text-muted underline">
-          Import
-        </Link>
+        <div className="ml-auto flex items-center gap-3 text-sm">
+          {uncategorised > 0 ? (
+            <Link href="/review" className="text-warn underline">
+              Sort {uncategorised} on line 32
+            </Link>
+          ) : null}
+          <Link href="/import" className="text-muted underline">
+            Import
+          </Link>
+        </div>
       </div>
 
       {transactions.length === 0 ? (
