@@ -39,7 +39,7 @@ Environment=PORT=3000
 
 # The standalone server, which needs no node_modules and honours HOSTNAME.
 # `next start` ignores HOSTNAME and would bind every interface.
-ExecStart=/usr/bin/node /opt/schedule-f-books/.next/standalone/server.js
+ExecStart=/usr/bin/node /opt/schedule-f-books/server.js
 
 # The app closes SQLite on SIGTERM, checkpointing the WAL so a backup taken
 # while stopped is one complete file.
