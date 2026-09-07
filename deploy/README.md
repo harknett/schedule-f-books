@@ -73,7 +73,7 @@ sudo systemctl status schedule-f-books
 Check it is alive:
 
 ```bash
-curl -s http://127.0.0.1:3000/api/health   # {"status":"ok"}
+curl -s http://127.0.0.1:3001/api/health   # {"status":"ok"}
 ```
 
 That endpoint touches the database, so it fails when the state directory is
@@ -99,7 +99,7 @@ server {
     client_max_body_size 32m;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
 
         # Next compares the Origin of a Server Action against the host it

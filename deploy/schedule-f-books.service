@@ -35,7 +35,10 @@ Environment=NODE_ENV=production
 # terminates TLS; binding publicly would expose it over plain HTTP, and the
 # session cookie is Secure in production so it would not work anyway.
 Environment=HOSTNAME=127.0.0.1
-Environment=PORT=3000
+# 3001, not 3000: the farm website takes 3000, and two services binding the
+# same loopback port means whichever starts second dies with EADDRINUSE. If
+# this is the only app on the host, 3000 is free.
+Environment=PORT=3001
 
 # The standalone server, which needs no node_modules and honours HOSTNAME.
 # `next start` ignores HOSTNAME and would bind every interface.

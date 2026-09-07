@@ -2,8 +2,71 @@ import type { NextConfig } from "next";
 
 import { SERVER_ACTION_BODY_LIMIT_BYTES } from "./src/lib/receipt-limits";
 
+/**
+ * Response headers.
+ *
+ * This app is meant to sit behind a VPN rather than on the open internet, but
+ * headers are the cheapest defence there is and "internal" is a description of
+ * today's network, not a property of the code.
+ *
+ * `img-src` includes `blob:` deliberately: the receipt picker previews a photo
+ * before upload with URL.createObjectURL, and a policy without it breaks that
+ * silently — the form still submits, the thumbnail is just gone. That is
+ * exactly the kind of failure a header change ships without anyone noticing.
+ *
+ * `'unsafe-inline'` for styles is Next's inlined critical CSS. Scripts get
+ * `'self'` only, which is the half that matters.
+ */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  // 'self' serves stored receipts through /api/receipts; blob: is the
+  // pre-upload preview; data: is the inline icon.
+  "img-src 'self' blob: data:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "object-src 'none'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   serverExternalPackages: ["node:sqlite"],
+
+  // Nothing gained by telling every visitor which framework to look up.
+  poweredByHeader: false,
+
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: CSP },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "DENY" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(self), microphone=(), geolocation=(), interest-cohort=()",
+          },
+          /*
+            No `preload` here, unlike the public site. Preloading commits a
+            hostname to HTTPS in every browser ahead of time and is painful to
+            undo; for books, which may well be reached over a VPN on a name
+            that changes, plain HSTS is the right amount of commitment.
+          */
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+        ],
+      },
+      {
+        // Financial records are never cached by anything in the middle.
+        source: "/api/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store, private" }],
+      },
+    ];
+  },
 
   /**
    * Emit a self-contained server alongside the build.
