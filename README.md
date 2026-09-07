@@ -251,8 +251,23 @@ the current year's instructions.
 
 ## Accounts and passwords
 
-The first account created is the farm owner. After that the owner adds people
-from **Settings**, handing over the password directly.
+The first account created is the farm owner, and creating it requires
+`SETUP_TOKEN` to be set in the environment:
+
+```bash
+SETUP_TOKEN=pick-something-long npm run dev
+```
+
+Visit `/register`, enter that token, create the owner. Then drop the variable —
+it is needed exactly once in the life of an installation, and an always-present
+one is a standing invitation. Without it `/register` says so and does nothing.
+
+The gate is there because between a service starting and its first account
+being made, whoever loads that page becomes the owner of the farm's books. On a
+laptop that window is imaginary. On a server it is real.
+
+After that the owner adds people from **Settings**, handing over the password
+directly.
 
 An account holding a password somebody else chose — a new account, or one just
 reset — is held at a change-password screen until it picks its own. Nothing
@@ -334,6 +349,48 @@ not look like its cause:
 - **Pass `Host` through the proxy.** Next validates the origin of every Server
   Action against it. Get it wrong and pages load perfectly while every save
   fails.
+
+## Security
+
+The books hold financial records, so the decisions worth knowing:
+
+- **Sign-in is throttled**, by address *and* by account. Those hold different
+  attacks: one address guessing many passwords, and many addresses each
+  guessing a little at one account. A throttled address is refused even with
+  the correct password, and a successful sign-in clears the slate so a fumbled
+  password is not held against you.
+- **An unknown email costs the same as a wrong password.** Sign-in verifies
+  against a decoy hash when no account matches, so the two paths take the same
+  time. Without that the error text was identical but the clock told you which
+  addresses had accounts.
+- **Creating the owner account needs `SETUP_TOKEN`** — see
+  [Accounts and passwords](#accounts-and-passwords).
+- **Security headers** are set in `next.config.ts`: a content-security policy
+  with scripts limited to this origin, `frame-ancestors 'none'`, `nosniff`,
+  `Referrer-Policy` and HSTS, with `X-Powered-By` off and `no-store` on the
+  routes that serve financial records.
+- Passwords are scrypt-hashed with the cost parameters stored per hash;
+  sessions are 256-bit random tokens persisted only as their SHA-256; the
+  cookie is `HttpOnly`, `SameSite=Lax` and `Secure` in production. Changing a
+  password signs that account out everywhere.
+- Receipt filenames are generated, never taken from the browser, and reads are
+  refused if they resolve outside the receipts directory.
+
+Known gaps, so they are decisions rather than surprises:
+
+- **A "member" is not a restricted role for the books.** Everyone signed in
+  sees all income, expenses and receipts; the role only limits user
+  administration and viewing other people's hours.
+- **There is no audit log.** `created_by` records who entered a transaction,
+  but edits and deletions leave no trace of who made them.
+- **Uploaded files are trusted for their type.** The allowlist checks the MIME
+  type the browser reports, not the bytes. That excludes SVG, which is the
+  format that would matter most, and receipts are served with `nosniff` — but
+  a file's contents are not verified against its declared type.
+
+This was built for a farm's own books behind a VPN. It is much better defended
+than it was, but if you put it on a public hostname, read those three gaps
+again and decide about each one.
 
 ## Accuracy and limits
 

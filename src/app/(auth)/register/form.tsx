@@ -23,6 +23,14 @@ export function RegisterForm() {
     <Card>
       <form action={action} className="space-y-4">
         <ErrorBanner message={state.error} />
+        <Field
+          label="Setup token"
+          htmlFor="setupToken"
+          hint="The value of SETUP_TOKEN in the service environment."
+        >
+          <Input id="setupToken" name="setupToken" required autoComplete="off" autoFocus />
+        </Field>
+
         <Field label="Your name" htmlFor="name">
           <Input id="name" name="name" autoComplete="name" required />
         </Field>

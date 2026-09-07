@@ -267,6 +267,42 @@ export class Store {
     this.db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
   }
 
+  // --- throttling ----------------------------------------------------------
+
+  recordLoginFailure(ip: string, email: string): void {
+    this.db
+      .prepare("INSERT INTO login_attempts (ip, email) VALUES (?, ?)")
+      .run(ip, email.toLowerCase());
+  }
+
+  /** Failures from one address in the last `minutes`. */
+  loginFailuresByIp(ip: string, minutes: number): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) AS n FROM login_attempts WHERE ip = ? AND at > datetime('now', ?)")
+      .get(ip, `-${minutes} minutes`) as Row;
+    return Number(row.n);
+  }
+
+  /** Failures against one account in the last `minutes`, from anywhere. */
+  loginFailuresByEmail(email: string, minutes: number): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) AS n FROM login_attempts WHERE email = ? AND at > datetime('now', ?)")
+      .get(email.toLowerCase(), `-${minutes} minutes`) as Row;
+    return Number(row.n);
+  }
+
+  /** A success clears the slate, so a fumbled password is not held against you. */
+  clearLoginFailures(ip: string, email: string): void {
+    this.db
+      .prepare("DELETE FROM login_attempts WHERE ip = ? OR email = ?")
+      .run(ip, email.toLowerCase());
+  }
+
+  /** Housekeeping, so the table does not grow without bound. */
+  pruneLoginAttempts(): void {
+    this.db.exec("DELETE FROM login_attempts WHERE at <= datetime('now', '-1 day')");
+  }
+
   // --- transactions --------------------------------------------------------
 
   createTransaction(input: NewTransaction): TransactionWithMeta {

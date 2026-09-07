@@ -122,9 +122,32 @@ If the app is reached under a hostname the proxy does not pass through in
 
 ## 5. Create the owner account
 
-Visit the site. The first account created is the farm owner. After that
-`/register` refuses, so there is no window for anyone else to claim it — but do
-this immediately rather than leaving a fresh install exposed.
+`/register` refuses to do anything unless `SETUP_TOKEN` is set in the service
+environment. Open it for as long as it takes, then close it again:
+
+```bash
+sudo systemctl edit schedule-f-books
+#   [Service]
+#   Environment=SETUP_TOKEN=<something long and random>
+sudo systemctl restart schedule-f-books
+```
+
+Visit `/register`, enter that token, and create the owner account. Then remove
+the override and restart:
+
+```bash
+sudo systemctl edit schedule-f-books     # delete the line
+sudo systemctl restart schedule-f-books
+```
+
+The gate exists because between the service starting and the first account
+being made, whoever loads that page becomes the owner of the farm's books.
+On a laptop that window is imaginary; on a server it is a real race, and on a
+public hostname it is a race against scanners that find new certificates in the
+transparency logs within hours.
+
+Everyone after the owner is added from **Settings**, so the token is needed
+exactly once in the life of the installation.
 
 ## Password recovery
 
@@ -160,21 +183,151 @@ which checkpoints the WAL back into the single file.
 **Back up before every upgrade.** This is tax records; the schema migrates
 forward automatically on start and there is no downgrade path.
 
-## Upgrading
+## Updating a running server
+
+The whole procedure, in the order it has to happen. It takes a couple of
+minutes and the site is down for about ten seconds of that.
+
+### 1. Back up first, every time
+
+Not optional. These are tax records, the schema migrates forward on start, and
+**there is no downgrade path** — a migration that has run cannot be un-run, so
+the backup is the only way back.
 
 ```bash
-git pull && npm ci && npm run build
+sudo -u schedule-f-books sqlite3 /var/lib/schedule-f-books/books.db \
+  ".backup '/var/backups/books-$(date +%F-%H%M).db'"
+sudo tar czf /var/backups/receipts-$(date +%F-%H%M).tar.gz \
+  -C /var/lib/schedule-f-books receipts
+```
+
+Check the backup is real before going on — a zero-byte file is worse than none,
+because you will trust it:
+
+```bash
+ls -lh /var/backups/books-*.db | tail -1
+sudo -u schedule-f-books sqlite3 /var/backups/books-$(date +%F)*.db \
+  "PRAGMA integrity_check; SELECT COUNT(*) FROM transactions;"
+```
+
+### 2. Note where you are, so you can get back
+
+```bash
+cd /path/to/your/checkout
+git rev-parse --short HEAD          # write this down
+```
+
+### 3. Fetch and read before building
+
+```bash
+git fetch origin
+git log --oneline HEAD..origin/master
+git diff --stat HEAD..origin/master -- src/lib/db/migrations.ts
+```
+
+That last line is the one worth pausing on. If migrations changed, the update
+will alter your database on the next start. If it shows nothing, this is a
+code-only update and the risk is much lower.
+
+```bash
+git pull --ff-only origin master
+```
+
+`--ff-only` refuses rather than creating a merge commit if the server checkout
+has drifted — which it should not have, and which you want to know about.
+
+### 4. Build
+
+```bash
+npm ci
+npm run build
+
+cp -r .next/static .next/standalone/.next/static
+cp -r public       .next/standalone/public
+```
+
+`npm ci` rather than `npm install`: it installs exactly the lockfile, so the
+server gets the dependency tree that was tested rather than whatever resolved
+today.
+
+Build **before** stopping the service. A build takes far longer than a restart,
+and there is no reason for the site to be down while it runs — nor for a failed
+build to leave you with a stopped service.
+
+### 5. Swap it in and restart
+
+```bash
+sudo rsync -a --delete .next/standalone/ /opt/schedule-f-books/
+sudo systemctl restart schedule-f-books
+```
+
+`--delete` removes files that are no longer part of the build. Without it a
+renamed route can linger and be served long after it was deleted from the
+source.
+
+### 6. Check it actually came back
+
+```bash
+systemctl status schedule-f-books --no-pager
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/login   # 200
+```
+
+Then watch the log for a moment. Migrations run on start, and this is where you
+would see one fail:
+
+```bash
+journalctl -u schedule-f-books -n 50 --no-pager
+```
+
+Finally, sign in and look at one real page — the Schedule F report is a good
+one, because it exercises the database, the report maths and the session all at
+once. A service that starts is not the same as a service that works.
+
+### If it goes wrong
+
+**The build failed.** Nothing has changed on the server yet. Fix it and start
+again; the old version is still running.
+
+**It starts but is broken, and migrations did not change.** Roll the code back
+and rebuild:
+
+```bash
+git checkout <the short hash from step 2>
+npm ci && npm run build
 cp -r .next/static .next/standalone/.next/static
 cp -r public       .next/standalone/public
 sudo rsync -a --delete .next/standalone/ /opt/schedule-f-books/
 sudo systemctl restart schedule-f-books
 ```
 
-Migrations run on start. Watch them land:
+**It starts but is broken, and migrations *did* change.** The database has
+already moved forward and older code will not understand it. Restore the
+backup as well as the code:
 
 ```bash
-journalctl -u schedule-f-books -f
+sudo systemctl stop schedule-f-books
+sudo -u schedule-f-books cp /var/backups/books-<timestamp>.db \
+  /var/lib/schedule-f-books/books.db
+sudo -u schedule-f-books rm -f /var/lib/schedule-f-books/books.db-wal \
+                               /var/lib/schedule-f-books/books.db-shm
+# ...then roll the code back as above, and start again.
+sudo systemctl start schedule-f-books
 ```
+
+Removing the `-wal` and `-shm` matters: they belong to the database you just
+replaced, and leaving them beside a restored file is how you get corruption
+rather than a rollback.
+
+**Anything entered between the backup and the rollback is lost.** That is the
+real argument for taking the backup immediately before the upgrade rather than
+relying on last night's.
+
+### Doing it regularly
+
+Nothing here needs to be memorised — but if you update often, the two habits
+worth keeping are taking a fresh backup every single time, and reading
+`git log HEAD..origin/master` before pulling rather than after something
+surprises you.
 
 ## Notes on the unit
 

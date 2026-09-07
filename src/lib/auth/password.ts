@@ -60,6 +60,27 @@ export async function verifyPassword(password: string, encoded: string): Promise
 }
 
 /**
+ * A hash of nothing in particular, to spend time against.
+ *
+ * Sign-in used to skip scrypt entirely when the email was unknown, which made
+ * a missing account answer measurably faster than a wrong password — the error
+ * text was identical, but the clock told you which addresses had accounts.
+ * Verifying against this instead keeps both paths costing the same.
+ *
+ * Built once per process and cached: the point is to spend the same time as a
+ * real verification, not to spend it twice.
+ */
+let decoyHash: string | undefined;
+
+/** Burn the work a real verification would, and always fail. */
+export async function verifyAgainstDecoy(password: string): Promise<false> {
+  decoyHash ??= await hashPassword(randomBytes(32).toString("base64url"));
+  await verifyPassword(password, decoyHash);
+  return false;
+}
+
+
+/**
  * Characters for a temporary password.
  *
  * No i, l, 1, o, 0 - a temporary password gets read aloud across a yard or

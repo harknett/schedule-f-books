@@ -184,4 +184,21 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0
     CHECK (must_change_password IN (0, 1));
   `,
+
+  // Failed sign-ins, for throttling.
+  //
+  // An unthrottled login is fine on a laptop and indefensible on a hostname.
+  // Two columns because two different attacks need holding: one address
+  // guessing many passwords, and many addresses each guessing a little at one
+  // account.
+  `
+  CREATE TABLE login_attempts (
+    id    INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip    TEXT NOT NULL,
+    email TEXT NOT NULL,
+    at    TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX idx_attempts_ip ON login_attempts(ip, at);
+  CREATE INDEX idx_attempts_email ON login_attempts(email, at);
+  `,
 ];
