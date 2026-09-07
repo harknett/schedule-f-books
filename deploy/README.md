@@ -73,7 +73,7 @@ sudo systemctl status schedule-f-books
 Check it is alive:
 
 ```bash
-curl -s http://127.0.0.1:3001/api/health   # {"status":"ok"}
+curl -s http://127.0.0.1:3000/api/health   # {"status":"ok"}
 ```
 
 That endpoint touches the database, so it fails when the state directory is
@@ -99,7 +99,7 @@ server {
     client_max_body_size 32m;
 
     location / {
-        proxy_pass http://127.0.0.1:3001;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
 
         # Next compares the Origin of a Server Action against the host it
@@ -190,3 +190,23 @@ journalctl -u schedule-f-books -f
   The app writes nothing outside `DATA_DIR`, so none of this gets in its way.
 - **`Restart=on-failure`**, not `always`: a configuration error should stay
   down and visible rather than flapping.
+
+## Ports on a shared host
+
+These services are designed to sit behind one reverse proxy on one machine, so
+each takes a different loopback port. Whichever two share a port, the second to
+start dies with EADDRINUSE.
+
+| Service | Port |
+| --- | --- |
+| schedule-f-books | 3000 |
+| eden-planner | 3001 |
+| tricklingspring | 3002 |
+
+Change one with a drop-in rather than by editing the shipped unit:
+
+```bash
+sudo systemctl edit <service>
+#   [Service]
+#   Environment=PORT=3005
+```
