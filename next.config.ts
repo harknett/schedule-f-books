@@ -9,28 +9,16 @@ import { SERVER_ACTION_BODY_LIMIT_BYTES } from "./src/lib/receipt-limits";
  * headers are the cheapest defence there is and "internal" is a description of
  * today's network, not a property of the code.
  *
- * `img-src` includes `blob:` deliberately: the receipt picker previews a photo
- * before upload with URL.createObjectURL, and a policy without it breaks that
- * silently — the form still submits, the thumbnail is just gone. That is
- * exactly the kind of failure a header change ships without anyone noticing.
+ * The Content-Security-Policy is deliberately NOT here: it needs a fresh nonce
+ * per request so Next's inline scripts can run, and only the proxy can mint
+ * one — see `src/proxy.ts`. That file also carries the `img-src blob:` note,
+ * because the receipt picker previews a photo with URL.createObjectURL and a
+ * policy without it breaks that silently: the form still submits, the
+ * thumbnail is just gone. Exactly the kind of failure a header change ships
+ * without anyone noticing.
  *
- * `'unsafe-inline'` for styles is Next's inlined critical CSS. Scripts get
- * `'self'` only, which is the half that matters.
+ * What remains below is identical on every response.
  */
-const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  // 'self' serves stored receipts through /api/receipts; blob: is the
-  // pre-upload preview; data: is the inline icon.
-  "img-src 'self' blob: data:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "object-src 'none'",
-].join("; ");
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["node:sqlite"],
@@ -43,7 +31,6 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: CSP },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
