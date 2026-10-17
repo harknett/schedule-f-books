@@ -166,12 +166,26 @@ It prints a temporary password once and signs that account out everywhere.
 
 Everything is in one directory: `books.db` plus the `receipts/` folder.
 
+Backups go in a folder the service user owns. `.backup` runs as that user, and
+`/var/backups` itself is root's: writing there fails with `cannot open`. Make
+the folder once:
+
+```bash
+sudo install -d -o schedule-f-books -g schedule-f-books -m 750 \
+  /var/backups/schedule-f-books
+```
+
+Don't run `sqlite3` as root to get round it. Root opening the live database can
+leave root-owned `-wal` and `-shm` files beside it that the service then cannot
+open.
+
 The clean way, without stopping the service:
 
 ```bash
+stamp=$(date +%F-%H%M)
 sudo -u schedule-f-books sqlite3 /var/lib/schedule-f-books/books.db \
-  ".backup '/var/backups/books-$(date +%F).db'"
-sudo tar czf /var/backups/receipts-$(date +%F).tar.gz \
+  ".backup '/var/backups/schedule-f-books/books-$stamp.db'"
+sudo tar czf /var/backups/schedule-f-books/receipts-$stamp.tar.gz \
   -C /var/lib/schedule-f-books receipts
 ```
 
@@ -194,21 +208,28 @@ Not optional. These are tax records, the schema migrates forward on start, and
 **there is no downgrade path** — a migration that has run cannot be un-run, so
 the backup is the only way back.
 
+The backup folder has to exist first; see [Backups](#backups) for the one-time
+`install -d`. Set the timestamp once so every file below carries the same one:
+
 ```bash
+stamp=$(date +%F-%H%M)
 sudo -u schedule-f-books sqlite3 /var/lib/schedule-f-books/books.db \
-  ".backup '/var/backups/books-$(date +%F-%H%M).db'"
-sudo tar czf /var/backups/receipts-$(date +%F-%H%M).tar.gz \
+  ".backup '/var/backups/schedule-f-books/books-$stamp.db'"
+sudo tar czf /var/backups/schedule-f-books/receipts-$stamp.tar.gz \
   -C /var/lib/schedule-f-books receipts
 ```
 
 Check the backup is real before going on — a zero-byte file is worse than none,
-because you will trust it:
+because you will trust it. The folder is closed to your own account, hence the
+`sudo` on `ls`:
 
 ```bash
-ls -lh /var/backups/books-*.db | tail -1
-sudo -u schedule-f-books sqlite3 /var/backups/books-$(date +%F)*.db \
+sudo ls -lh /var/backups/schedule-f-books/
+sudo -u schedule-f-books sqlite3 /var/backups/schedule-f-books/books-$stamp.db \
   "PRAGMA integrity_check; SELECT COUNT(*) FROM transactions;"
 ```
+
+You want `ok`, then your transaction count.
 
 ### 2. Note where you are, so you can get back
 
@@ -306,7 +327,7 @@ backup as well as the code:
 
 ```bash
 sudo systemctl stop schedule-f-books
-sudo -u schedule-f-books cp /var/backups/books-<timestamp>.db \
+sudo -u schedule-f-books cp /var/backups/schedule-f-books/books-<timestamp>.db \
   /var/lib/schedule-f-books/books.db
 sudo -u schedule-f-books rm -f /var/lib/schedule-f-books/books.db-wal \
                                /var/lib/schedule-f-books/books.db-shm
