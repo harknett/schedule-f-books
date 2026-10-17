@@ -15,6 +15,7 @@ import { normalizeHeader, type CsvRow } from "./csv";
 import { parseDuration } from "./duration";
 import { isIsoDate } from "./dates";
 import { parseAmount, type Cents } from "./money";
+import { taskKey } from "./tasks";
 import {
   categoriesFor,
   getCategory,
@@ -475,7 +476,7 @@ export function transactionKey(t: {
 }
 
 export function timeEntryKey(t: { date: string; minutes: number; task: string }): string {
-  return [t.date, t.minutes, t.task.trim().toLowerCase()].join("|");
+  return [t.date, t.minutes, taskKey(t.task)].join("|");
 }
 
 export function isTransaction(record: ImportedRecord): record is ImportedTransaction {

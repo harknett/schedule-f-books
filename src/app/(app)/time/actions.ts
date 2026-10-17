@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { requireUser } from "@/lib/auth/guard";
 import { getStore } from "@/lib/db";
@@ -89,8 +90,7 @@ export async function logTime(_prev: TimeFormState, formData: FormData): Promise
       }
     });
 
-    revalidatePath("/time");
-    revalidatePath("/");
+    revalidateHours();
     return {
       savedMinutes: minutes,
       savedCount: toWrite.length,
@@ -102,6 +102,54 @@ export async function logTime(_prev: TimeFormState, formData: FormData): Promise
   }
 }
 
+/** Everywhere hours are shown: the log, the per-task lists, and home. */
+function revalidateHours(): void {
+  revalidatePath("/time");
+  revalidatePath("/time/task");
+  revalidatePath("/time/[id]", "page");
+  revalidatePath("/");
+}
+
+/**
+ * Where to go after an edit. Only paths inside the hours pages are honoured,
+ * so a crafted link cannot bounce someone off-site.
+ */
+function readReturnTo(formData: FormData): string {
+  const back = String(formData.get("back") ?? "");
+  return /^\/time(?:[/?]|$)/.test(back) ? back : "/time";
+}
+
+export interface EditTimeFormState {
+  error?: string;
+}
+
+export async function updateTimeEntry(
+  id: number,
+  _prev: EditTimeFormState,
+  formData: FormData,
+): Promise<EditTimeFormState> {
+  const user = await requireUser();
+
+  try {
+    const task = String(formData.get("task") ?? "").trim();
+    if (task === "") return { error: "Say what you worked on." };
+
+    const notesRaw = String(formData.get("notes") ?? "").trim();
+    const updated = getStore().updateTimeEntry(id, user.id, {
+      date: requireIsoDate(String(formData.get("date") ?? "")),
+      minutes: parseDuration(String(formData.get("duration") ?? "")),
+      task,
+      notes: notesRaw === "" ? null : notesRaw,
+    });
+    if (!updated) return { error: "That entry no longer exists." };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Could not update that entry." };
+  }
+
+  revalidateHours();
+  redirect(readReturnTo(formData));
+}
+
 export async function deleteTimeEntry(formData: FormData): Promise<void> {
   const user = await requireUser();
   const id = Number(formData.get("id"));
@@ -110,6 +158,7 @@ export async function deleteTimeEntry(formData: FormData): Promise<void> {
   // Scoped to the signed-in user: nobody edits someone else's hours.
   getStore().deleteTimeEntry(id, user.id);
 
-  revalidatePath("/time");
-  revalidatePath("/");
+  revalidateHours();
+  // Deleting from the edit page leaves nothing to look at there.
+  if (formData.has("back")) redirect(readReturnTo(formData));
 }

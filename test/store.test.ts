@@ -231,6 +231,55 @@ describe("time entries", () => {
     ]);
   });
 
+  it("treats tasks that differ only in capitalisation as one", () => {
+    const user = makeUser();
+    store.createTimeEntry({ userId: user.id, date: "2026-03-01", minutes: 60, task: "Chicken tending" });
+    store.createTimeEntry({ userId: user.id, date: "2026-03-02", minutes: 30, task: "Chicken Tending" });
+    store.createTimeEntry({ userId: user.id, date: "2026-03-03", minutes: 45, task: "chicken tending " });
+    store.createTimeEntry({ userId: user.id, date: "2026-03-04", minutes: 100, task: "Fencing" });
+
+    // Labelled with the spelling that carries the most time.
+    expect(store.minutesByTask(user.id, 2026)).toEqual([
+      { task: "Chicken tending", minutes: 135 },
+      { task: "Fencing", minutes: 100 },
+    ]);
+    expect(
+      store.listTimeEntriesForTask(user.id, "CHICKEN TENDING", 2026).map((e) => e.minutes),
+    ).toEqual([45, 30, 60]);
+  });
+
+  it("lists past task names once each, most recent first", () => {
+    const user = makeUser();
+    store.createTimeEntry({ userId: user.id, date: "2026-03-01", minutes: 60, task: "Fencing" });
+    store.createTimeEntry({ userId: user.id, date: "2026-03-02", minutes: 60, task: "chicken tending" });
+    store.createTimeEntry({ userId: user.id, date: "2026-03-03", minutes: 60, task: "Chicken Tending" });
+
+    expect(store.listTaskNames(user.id)).toEqual(["Chicken Tending", "Fencing"]);
+  });
+
+  it("only lets the owner of an entry edit it", () => {
+    const mine = makeUser("me@example.com");
+    const theirs = store.createUser({
+      email: "them@example.com",
+      name: "Someone Else",
+      passwordHash: "x",
+      role: "member",
+    });
+    const entry = store.createTimeEntry({
+      userId: mine.id,
+      date: "2026-03-01",
+      minutes: 60,
+      task: "Chores",
+    });
+    const fields = { date: "2026-03-05", minutes: 90, task: "Fencing", notes: "North line" };
+
+    expect(store.updateTimeEntry(entry.id, theirs.id, fields)).toBe(false);
+    expect(store.getTimeEntry(entry.id)!.task).toBe("Chores");
+
+    expect(store.updateTimeEntry(entry.id, mine.id, fields)).toBe(true);
+    expect(store.getTimeEntry(entry.id)).toMatchObject(fields);
+  });
+
   it("only lets the owner of an entry delete it", () => {
     const mine = makeUser("me@example.com");
     const theirs = store.createUser({

@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 
 import { yearBounds } from "@/lib/dates";
+import { taskKey } from "@/lib/tasks";
 import type { CategoryKind } from "@/lib/schedule-f";
 
 import { MIGRATIONS } from "./migrations";
@@ -540,6 +541,48 @@ export class Store {
     return Number(info.changes) > 0;
   }
 
+  /** Change an entry in place. Scoped to its owner, like delete. */
+  updateTimeEntry(
+    id: number,
+    userId: number,
+    fields: { date: string; minutes: number; task: string; notes: string | null },
+  ): boolean {
+    const info = this.db
+      .prepare(
+        "UPDATE time_entries SET date = ?, minutes = ?, task = ?, notes = ? WHERE id = ? AND user_id = ?",
+      )
+      .run(fields.date, fields.minutes, fields.task, fields.notes, id, userId);
+    return Number(info.changes) > 0;
+  }
+
+  /**
+   * Every task name a user has logged, one per spelling-insensitive task, most
+   * recently used first. The spelling kept is the most recent one.
+   */
+  listTaskNames(userId: number): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT task, MAX(date) AS last_date, MAX(id) AS last_id
+         FROM time_entries
+         WHERE user_id = ?
+         GROUP BY task
+         ORDER BY last_date DESC, last_id DESC`,
+      )
+      .all(userId) as Row[];
+    const byKey = new Map<string, string>();
+    for (const row of rows) {
+      const task = str(row.task).trim();
+      if (!byKey.has(taskKey(task))) byKey.set(taskKey(task), task);
+    }
+    return [...byKey.values()];
+  }
+
+  /** A user's entries for one task in a year, ignoring capitalisation. */
+  listTimeEntriesForTask(userId: number, task: string, year: number): TimeEntry[] {
+    const key = taskKey(task);
+    return this.listTimeEntries(userId, { year }).filter((entry) => taskKey(entry.task) === key);
+  }
+
   listTimeEntries(userId: number, opts: { year?: number; limit?: number } = {}): TimeEntry[] {
     const clauses = ["user_id = ?"];
     const params: Array<string | number> = [userId];
@@ -846,7 +889,11 @@ export class Store {
     return rows.map((r) => ({ ...mapTimeEntry(r), userName: nstr(r.user_name) }));
   }
 
-  /** Minutes grouped by task for a year, largest first. */
+  /**
+   * Minutes grouped by task for a year, largest first. Spellings that differ
+   * only in capitalisation are one task, shown under whichever spelling
+   * carries the most time.
+   */
   minutesByTask(userId: number, year: number): Array<{ task: string; minutes: number }> {
     const { start, end } = yearBounds(year);
     const rows = this.db
@@ -858,6 +905,15 @@ export class Store {
          ORDER BY minutes DESC`,
       )
       .all(userId, start, end) as Row[];
-    return rows.map((r) => ({ task: str(r.task), minutes: num(r.minutes) }));
+
+    // Rows arrive largest first, so the first spelling seen is the label.
+    const byKey = new Map<string, { task: string; minutes: number }>();
+    for (const row of rows) {
+      const task = str(row.task).trim();
+      const group = byKey.get(taskKey(task));
+      if (group) group.minutes += num(row.minutes);
+      else byKey.set(taskKey(task), { task, minutes: num(row.minutes) });
+    }
+    return [...byKey.values()].sort((a, b) => b.minutes - a.minutes);
   }
 }

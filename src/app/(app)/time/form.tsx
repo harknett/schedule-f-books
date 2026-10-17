@@ -3,8 +3,14 @@
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 
-import { logTime, type TimeFormState } from "./actions";
+import {
+  logTime,
+  updateTimeEntry,
+  type EditTimeFormState,
+  type TimeFormState,
+} from "./actions";
 import { Button, Card, ErrorBanner, Field, Input, Textarea } from "@/components/ui";
+import type { TimeEntry } from "@/lib/db/types";
 import {
   ALL_WEEKDAYS,
   WEEKDAY_LABELS,
@@ -13,20 +19,6 @@ import {
   type Weekday,
 } from "@/lib/dates";
 import { formatDuration } from "@/lib/duration";
-
-/** Common farm tasks, offered as suggestions but never enforced. */
-const TASK_SUGGESTIONS = [
-  "Livestock chores",
-  "Fencing",
-  "Irrigation",
-  "Planting",
-  "Harvest",
-  "Equipment maintenance",
-  "Pasture management",
-  "Compost & soil",
-  "Marketing & sales",
-  "Recordkeeping",
-];
 
 type Mode = "single" | "range";
 
@@ -41,7 +33,33 @@ function Submit({ count }: { count: number | null }) {
   );
 }
 
-export function TimeForm({ today }: { today: string }) {
+/**
+ * The task box. Suggestions are the tasks already logged, so typing "chi"
+ * offers "Chicken tending" rather than inviting a third spelling of it.
+ */
+function TaskField({ suggestions, defaultValue }: { suggestions: string[]; defaultValue?: string }) {
+  return (
+    <Field label="Task" htmlFor="task">
+      <Input
+        id="task"
+        name="task"
+        list="task-suggestions"
+        placeholder="Fencing"
+        autoCapitalize="sentences"
+        autoComplete="off"
+        defaultValue={defaultValue}
+        required
+      />
+      <datalist id="task-suggestions">
+        {suggestions.map((task) => (
+          <option key={task} value={task} />
+        ))}
+      </datalist>
+    </Field>
+  );
+}
+
+export function TimeForm({ today, suggestions }: { today: string; suggestions: string[] }) {
   const [state, action] = useActionState<TimeFormState, FormData>(logTime, {});
 
   return (
@@ -62,13 +80,13 @@ export function TimeForm({ today }: { today: string }) {
         ) : null}
 
         {/* Keyed on the save token: a successful save brings back empty fields. */}
-        <TimeFields key={state.savedAt ?? 0} today={today} />
+        <TimeFields key={state.savedAt ?? 0} today={today} suggestions={suggestions} />
       </form>
     </Card>
   );
 }
 
-function TimeFields({ today }: { today: string }) {
+function TimeFields({ today, suggestions }: { today: string; suggestions: string[] }) {
   const [mode, setMode] = useState<Mode>("single");
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
@@ -192,21 +210,7 @@ function TimeFields({ today }: { today: string }) {
           />
         </Field>
 
-        <Field label="Task" htmlFor="task">
-          <Input
-            id="task"
-            name="task"
-            list="task-suggestions"
-            placeholder="Fencing"
-            autoCapitalize="sentences"
-            required
-          />
-          <datalist id="task-suggestions">
-            {TASK_SUGGESTIONS.map((task) => (
-              <option key={task} value={task} />
-            ))}
-          </datalist>
-        </Field>
+        <TaskField suggestions={suggestions} />
       </div>
 
       <Field label="Notes" htmlFor="notes">
@@ -242,5 +246,69 @@ function TimeFields({ today }: { today: string }) {
 
       <Submit count={mode === "range" ? (rangeProblem ? 0 : dayCount) : null} />
     </>
+  );
+}
+
+function SaveChanges() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" className="w-full" disabled={pending}>
+      {pending ? "Saving…" : "Save changes"}
+    </Button>
+  );
+}
+
+export function EditTimeForm({
+  entry,
+  suggestions,
+  back,
+}: {
+  entry: TimeEntry;
+  suggestions: string[];
+  back: string;
+}) {
+  const [state, action] = useActionState<EditTimeFormState, FormData>(
+    updateTimeEntry.bind(null, entry.id),
+    {},
+  );
+
+  return (
+    <Card>
+      <form action={action} className="space-y-5">
+        <ErrorBanner message={state.error} />
+        <input type="hidden" name="back" value={back} />
+
+        <Field label="Date" htmlFor="date">
+          <Input id="date" name="date" type="date" defaultValue={entry.date} required />
+        </Field>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="Time worked" htmlFor="duration" hint="2.5, 2h 30m, 2:30, or 90m.">
+            <Input
+              id="duration"
+              name="duration"
+              inputMode="decimal"
+              defaultValue={formatDuration(entry.minutes)}
+              required
+              className="tabular"
+            />
+          </Field>
+
+          <TaskField suggestions={suggestions} defaultValue={entry.task} />
+        </div>
+
+        <Field label="Notes" htmlFor="notes">
+          <Textarea
+            id="notes"
+            name="notes"
+            rows={2}
+            placeholder="Optional."
+            defaultValue={entry.notes ?? ""}
+          />
+        </Field>
+
+        <SaveChanges />
+      </form>
+    </Card>
   );
 }
